@@ -2,7 +2,8 @@ import os
 from openquake.hazardlib.sourceconverter import SourceConverter
 from openquake.commonlib.readinput import (get_oqparam,
                                            get_source_model_lt,
-                                           get_gsim_lt)
+                                           get_gsim_lt,
+                                           get_imts)
 from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.geo import Polygon, Point
@@ -25,6 +26,7 @@ def parse_openquake_ini(job_ini):
     ssm_lt = get_source_model_lt(oqparam)
     # Reag the gsim logic tree
     gsim_lt = get_gsim_lt(oqparam)
+    # imts = get_imts(oqparam)
     return oqparam, ssm_lt, gsim_lt
 
 
@@ -37,6 +39,7 @@ def get_sources_from_rlz(rlz, oqparam, ssm_lt):
 
     :return : a list of seismic sources instances, e.g.
                   "openquake.hazardlib.source.area.AreaSource"
+    NOTE/ Incompatibility: method ssm_lt.apply_incertainties() has been removed in openquake.engine versions >= 3.9
     """
     # Creating a source converter
     conv = SourceConverter(oqparam.investigation_time,
