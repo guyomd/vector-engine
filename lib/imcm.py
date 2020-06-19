@@ -65,7 +65,7 @@ class BakerCornell2006(IntensityMeasureCorrelationModel):
         Tmin = min(T1, T2)
         Tmax = max(T1, T2)
         if (Tmin < 0.05) or (Tmax > 5):
-            raise ValueError(f'Periods are beyond the uppper/lower bounds of the {self.name} model')
+            raise ValueError('Periods are beyond the uppper/lower bounds of the {} model'.format(self.name))
         if Tmin < 0.189:
             r = 1 - np.cos(np.pi / 2 - (0.359 + 0.163 * np.log(Tmin / 0.189)) \
                            * np.log(Tmax / Tmin))
