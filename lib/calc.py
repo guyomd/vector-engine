@@ -236,7 +236,6 @@ class VectorValuedCalculator():
         max_nb = np.prod(shape)
         logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
         logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
-
         output = np.empty(shape)
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
 
@@ -296,7 +295,6 @@ class VectorValuedCalculator():
                 # indices = np.unravel_index(indx, shape)
                 output[(k,) + indices] = hazard_output[k]
             """
-
         output = np.empty(shape)
         for result in Starmap(_matrix_cell_worker, args):
             # Sort results for each site:
@@ -351,3 +349,4 @@ def _matrix_cell_worker(indices, fun, lnSA, monitor):
     result = {'indices': indices}
     result.update({'output': fun(lnSA)})
     return result
+

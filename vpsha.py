@@ -10,7 +10,7 @@ from lib.main import run_job
 
 # HELP:
 # To launch the script use the following command:
-#   python3 vpsha.py "AreaSourceClassicalPSHA/job.ini"
+#   python3 vpsha.py "AreaSourceClassicalPSHA/job.ini" [full/optim]
 #
 # Below the following parameters can be changed by the user:
 #  quantity = "poe" or "are"
@@ -78,4 +78,3 @@ if __name__ == "__main__":
         parallel.Starmap.shutdown()
         if OQ_DISTRIBUTE.startswith('celery'):
             celery_cleanup(TERMINATE)
-
