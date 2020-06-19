@@ -1,3 +1,4 @@
+import logging
 from lib import parser, mdhc
 from plotutils import ProgressBar
 import numpy as np
@@ -107,7 +108,7 @@ class VectorValuedCalculator():
         return prob
 
 
-    def pt_src_are(self, pt_src, gsim, weight, lnSA):
+    def pt_src_are(self, pt_src, gsim, weight, lnSA, monitor):
         """
         Returns the vector-valued Annual Rate of Exceedance for one single point-source
 
@@ -167,7 +168,7 @@ class VectorValuedCalculator():
                         gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(
                             gsim_rlz)
                         pt_weight = weight * gsim_weight
-                        are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA)
+                        are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
         return are
 
     def are_parallel(self, lnSA):
@@ -176,31 +177,29 @@ class VectorValuedCalculator():
 
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
-        #args_list = list()
-        with hdf5new() as hdf5:
-            smap = Starmap(self.pt_src_are.__func__, h5=hdf5)
+        args_list = list()
+        #with hdf5new() as hdf5:
+            #smap = Starmap(self.pt_src_are.__func__, h5=hdf5)
+        for rlz in self.ssm_lt:  # Loop over realizations
+            _, weight = parser.get_value_and_weight_from_rlz(rlz)   
+            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt)
 
-            for rlz in self.ssm_lt:  # Loop over realizations
-                _, weight = parser.get_value_and_weight_from_rlz(rlz)
-                srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt)
+            for src in srcs:  # Loop over seismic sources (area, fault, etc...)
 
-                for src in srcs:  # Loop over seismic sources (area, fault, etc...)
+                for pt in src:  # Loop over point-sources
 
-                    for pt in src:  # Loop over point-sources
+                    gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
+                    for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
+                        gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(gsim_rlz)
 
-                        gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
-                        for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
-                            gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(
-                                gsim_rlz)
-
-                            # Distribute ARE:
-                            pt_weight = weight*gsim_weight
-                            args = (self, pt, gsim_model, pt_weight, lnSA)
-                            #args_list.append(args)
-                            smap.submit(args)
+                        # Distribute ARE:
+                        pt_weight = weight*gsim_weight
+                        args = (self, pt, gsim_model, pt_weight, lnSA)
+                        args_list.append(args)
+                        #smap.submit(args)
 
             are = 0
-            for value in smap:
+            for value in Starmap(self.pt_src_are.__func__, args_list):
                 are += value
         return are
 
@@ -223,10 +222,11 @@ class VectorValuedCalculator():
         are = self.are_parallel(lnSA)
         return 1-np.exp(-are*self.oqparam.investigation_time)
 
-    def hazard_matrix(self, quantity='poe', show_progress=True):
+    def hazard_matrix(self, quantity='poe'):
         """
         Compute exhaustively the full VPSHA hazard matrix of ARE/POE over the N-dimensional space of
         spectral periods or parameters.
+        NOTE: Parallelization occurs on the loop over seismic point sources
         WARNING !! This computation can be extremely expensive for high-dimensional problems !
         """
         # Initialization step:
@@ -234,10 +234,8 @@ class VectorValuedCalculator():
         hc_calc_method = getattr(self, quantity+'_parallel')  # self.poe or self.are method
         shape = (len(self.sites),) + tuple(len(self.oqparam.imtls[str(p)]) for p in self.periods)
         max_nb = np.prod(shape)
-        print(f'\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {shape}\n')
-        print(f'VPSHA matrix  matrix has {max_nb} elements')
-        if show_progress:
-            pbar = ProgressBar()
+        logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
+        logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
 
         output = np.empty(shape)
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
@@ -246,8 +244,6 @@ class VectorValuedCalculator():
         acc_meshes = np.meshgrid(*acc_discretization, indexing='ij', copy=False)
         nelts = int(np.prod(shape[1:]))  # Number of N-D pseudo spectral values
         for i in range(nelts):
-            if show_progress:
-                pbar.update(i, nelts, title='VPSHA computation progress: ', nsym=30)
             indices = np.unravel_index(i, shape[1:])  # Flat to multi-dimensional index
             accels = [ acc_meshes[j][indices] for j in range(self.ndims)]
 
@@ -261,10 +257,11 @@ class VectorValuedCalculator():
         self.hc.hazard_matrix = output
         return self.hc
 
-    def hazard_matrix_parallel(self, quantity='poe', show_progress=True):
+    def hazard_matrix_parallel(self, quantity='poe'):
         """
         Compute exhaustively the full VPSHA hazard matrix of ARE/POE over the N-dimensional space of
         spectral periods or parameters.
+        NOTE: Parallelization occurs on the loop over N-D hazard matrix cells
         WARNING !! This computation can be extremely expensive for high-dimensional problems !
         """
         # Initialization step:
@@ -274,10 +271,8 @@ class VectorValuedCalculator():
         shape = (len(self.sites),) + tuple(len(self.oqparam.imtls[str(p)]) for p in self.periods)
         max_nb = np.prod(shape)
 
-        print(f'\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {shape}\n')
-        print(f'VPSHA matrix  matrix has {max_nb} elements')
-        if show_progress:
-            pbar = ProgressBar()
+        logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
+        logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
 
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
 
@@ -285,12 +280,9 @@ class VectorValuedCalculator():
         acc_meshes = np.meshgrid(*acc_discretization, indexing='ij', copy=False)
         nelts = int(np.prod(shape[1:]))  # Number of N-D pseudo spectral values
         for i in range(nelts):
-            #if show_progress:
-            #    pbar.update(i, nelts, title='VPSHA computation progress: ', nsym=30)
             indices = np.unravel_index(i, shape[1:])  # Flat to multi-dimensional index
             accels = [ acc_meshes[j][indices] for j in range(self.ndims)]
-            #print(f"  # Current acceleration vector: a{tuple(str(p) for p in self.periods)} =
-            # {accels}\n")
+            logging.debug(f"  # Current acceleration vector: {tuple(str(p) for p in self.periods)} =  {accels}\n")
 
             # Call hazard curve computation method:
             #hazard_output = hc_calc_method(accels)
@@ -305,12 +297,8 @@ class VectorValuedCalculator():
                 output[(k,) + indices] = hazard_output[k]
             """
 
-        cnt = 0
         output = np.empty(shape)
         for result in Starmap(_matrix_cell_worker, args):
-            cnt += 1
-            if show_progress:
-                pbar.update(cnt, max_nb, title='VPSHA computation progress: ', nsym=30)
             # Sort results for each site:
             for k in range(len(result['output'])):
                 # Loop on sites, i.e. 1st dimension of  "hazard_output"

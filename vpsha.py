@@ -1,100 +1,81 @@
-
-from lib import imcm, mdhc, parser, calc  # IMPORT VPSHA MODULES
-from openquake.commonlib.readinput import get_oqparam, get_imts
-from openquake.baselib.parallel import Starmap
-from numpy import savetxt
-import h5py
-from datetime import datetime
 import time
 import sys
+import logging
+from datetime import datetime
+
+from openquake.baselib import parallel, config 
+from openquake.commonlib.oqvalidation import OqParam
+
+from lib.main import run_job
 
 # HELP:
-# To laucnh the script use the following command:
+# To launch the script use the following command:
 #   python3 vpsha.py "AreaSourceClassicalPSHA/job.ini"
 #
 # Below the following parameters can be changed by the user:
 #  quantity = "poe" or "are"
 
-def main(job_ini, quantity = 'poe', calc_mode = 'full'):
-    """
-    :param job_ini: str, path to Openquake configuration file (e.g. job.ini)
-    :param quantity: str, quantity of interest: 'poe', 'are'
-    :param calc_mode: str, calculation mode: Full hazard matrix computation ("full"),
-                           or optimized search for vector samples matching POE/ARE ("optim")
-    """
-    start_time = time.time()
+TERMINATE = config.distribution.terminate_workers_on_revoke
+OQ_DISTRIBUTE = parallel.oq_distribute()
+logging.basicConfig(level=logging.INFO,
+                    format='[%(asctime)s] %(message)s') # In command-line "--log=INFO", other levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
-    # Parse the seismic source model:
-    oqparam = get_oqparam(job_ini)
+logging.info('OQ_DISTRIBUTE set to "{}"'.format(OQ_DISTRIBUTE))
+if OQ_DISTRIBUTE.startswith('celery'):
+    import celery.task.control
+    
+    def set_concurrent_tasks_default():
+        stats = celery.task.control.inspect(timeout=1).stats()
+        if not stats:
+            logging.critical('No live computation nodes, aborting calculation')
+            sys.exit(1)
+        ncores = sum(stats[k]['pool']['max-concurrency'] for k in stats)
+        parallel.CT = ncores * 2
+        OqParam.concurrent_tasks.default = ncores * 2
+        logging.warning('Using %s, %d cores',','.join(sorted(stats)), ncores)
 
-    # Get the list of Tectonic Region Types :
-    trt = oqparam._gsims_by_trt.keys()
+    def celery_cleanup(terminate):
+        """
+        Release the resources used by an openquake job.
+        In particular revoke the running tasks (if any).
+        :param bool terminate: the celery revoke command terminate flag
+        :param tasks: celery tasks
+        """
+        # Using the celery API, terminate and revoke and terminate any running
+        # tasks associated with the current job.
+        tasks = parallel.Starmap.running_tasks
+        if tasks:
+            logging.warning('Revoking %d tasks', len(tasks))
+        else:  # this is normal when OQ_DISTRIBUTE=no
+            logging.debug('No task to revoke')
+        while tasks:
+            task = tasks.pop()
+            tid = task.task_id
+            celery.task.control.revoke(tid, terminate=terminate)
+            logging.debug('Revoked task %s', tid)
+else:
 
-    # Set the Ground-motion correlation model:
-    # exists in Openquake :ground_motion_correlation_model
-    cm = imcm.BakerCornell2006()
+    def set_concurrent_tasks_default():
+        pass
 
-    # Manage the target sites specification, as site, site-collection or as a region:
-    sites_col = parser.parse_sites(oqparam)
-
-    # Initialize multi-dimensional hazard curve:
-    print(get_imts(oqparam))
-    #    periods = oqparam.imtls.keys()
-
-
-    # Initialize VPS§HA calculator:
-    c = calc.VectorValuedCalculator(oqparam, sites_col, cm)
-
-    # Count total number of point-sources:
-    npts = c.count_pointsources()
-    print(f'\nNumber of point-sources: {npts}')
-
-    if calc_mode.lower()=="full":
-        # Next line distributes calculation over hazard-matrix cells:
-        #hc = c.hazard_matrix(quantity=quantity, show_progress=True)
-
-        # Next line distributes calculation over individual point-sources:
-        hc = c.hazard_matrix_parallel(quantity=quantity, show_progress=True)
-
-        # Save to HDF5 file:
-        results_file = f'{quantity}_' \
-                       f'{datetime.now().replace(microsecond=0).isoformat()}.hdf5'.replace(':','')
-        with h5py.File(results_file, 'w') as h5f:
-            h5f.create_dataset('output', data=hc.hazard_matrix)
-
-    elif calc_mode.lower()=='optim':
-        # Find POE by multi-dimensional optimization (e.g. Simplex method, Newton-Raphson method etc...)
-        if quantity.lower()=='are':
-            targets = calc.poe2are(oqparam.poes)
-        elif quantity.lower()=='poe':
-            targets = oqparam.poes
-        else:
-            raise ValueError(f'Unknown hazard curve quantity "{quantity}"')
-
-        n_sol = 10  # Number of vector-sample matching target
-        for trg in targets:
-            print(f'Searching for pseudo-acceleration vector matching POE={trg}:')
-            output = c.find_matching_vector_sample(trg,
-                                                   quantity=quantity,
-                                                   tol=0.001,
-                                                   n_real=n_sol)
-            results_file = f'{quantity}_{trg}' \
-                           f'_{datetime.now().replace(microsecond=0).isoformat()}.csv'.replace(':','')
-            header_cols = [quantity.upper()] + [str(p) for p in c.periods]
-            savetxt(results_file, output, fmt='%.6e', delimiter=',', header=','.join(header_cols))
-            print(output)
-
-    else:
-        raise ValueError(f'Unknown calculation mode "{calc_mode}"')
-
-    print(f'\n>> Results stored in file {results_file}')
-    print(f'\nElapsed time: {time.time()-start_time:.3f} s.')
 
 
 if __name__ == "__main__":
-    Starmap.init()
+    parallel.Starmap.init()
+    if len(sys.argv)>2:
+        calc_mode = sys.argv[2]
+    else:
+        calc_mode = "full"
     try:
-        main(sys.argv[1], quantity='poe', calc_mode='optim')
+        logging.info('Setting up default settings for concurrent tasks')
+        set_concurrent_tasks_default()
+        t0 = time.time()
+        logging.info('Starting VPSHA computation run on {}'.format(datetime.now()))
+        job_ini = sys.argv[1]
+        run_job(job_ini, quantity='poe', calc_mode=calc_mode)
+        logging.warning('Calculation finished correctly in {:.1f} seconds'.format(time.time()-t0))
     finally:
-        Starmap.shutdown()
+        parallel.Starmap.shutdown()
+        if OQ_DISTRIBUTE.startswith('celery'):
+            celery_cleanup(TERMINATE)
 

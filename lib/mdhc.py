@@ -47,10 +47,10 @@ class MultiDimensionalHazardCurve():
                 if i != j:
                     corr[j, i] = corr[i, j]
         if not is_pos_semidef(corr):
-            print(f'ERROR: Correlation matrix is not positive, semi-definite')
+            print('ERROR: Correlation matrix is not positive, semi-definite')
             val = np.linalg.eigvals(corr)
-            print(f'EIGENVALUES: {val}')
-            print(f'ADVICE: REPLACE negative eigenvalues with 0')
+            print('EIGENVALUES: {}'.format(val))
+            print('ADVICE: REPLACE negative eigenvalues with 0')
             raise ValueError('Inappropriate Ground-motion Correlation matrix')
         else:
             self.corr = corr
