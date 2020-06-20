@@ -236,6 +236,7 @@ class VectorValuedCalculator():
         max_nb = np.prod(shape)
         logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
         logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
+
         output = np.empty(shape)
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
 
@@ -295,6 +296,7 @@ class VectorValuedCalculator():
                 # indices = np.unravel_index(indx, shape)
                 output[(k,) + indices] = hazard_output[k]
             """
+
         output = np.empty(shape)
         for result in Starmap(_matrix_cell_worker, args):
             # Sort results for each site:
@@ -309,7 +311,7 @@ class VectorValuedCalculator():
         return self.hc
 
 
-    def find_matching_vector_sample(self, target, quantity='poe', tol=None, n_real=1):
+    def find_matching_vector_sample(self, target, quantity='poe', tol=None, nsol=1):
         """
         Returns a list of vector-valued coordinates corresponding to the Multi-Dimensional Hazard
         Curve ARE/POE value TARGET (within tolerance interval +/- TOL). This list of
@@ -317,31 +319,30 @@ class VectorValuedCalculator():
 
         :return: Coordinate of vector-sample with matching QUANTITY=TARGET
         """
+
+        # TOL: Tolerance on cost-function evaluation w/r to TARGET:
         if tol is None:
-            tol = target/10
-        hc_calc_method = lambda x: np.power(target- getattr(self, quantity)(x), 2)
+            tol = target/1E3
+
         lower_bound = [np.log(min(self.oqparam.imtls[str(p)])) for p in self.periods]
         upper_bound = [np.log(max(self.oqparam.imtls[str(p)])) for p in self.periods]
 
-        # Loop on iterations:
-        coord = np.empty( (n_real, 1+len(self.periods)) )
-        for i in range(n_real):
-
-            x0 = np.array([ np.random.uniform(l,u) for l,u in zip(lower_bound,upper_bound) ])
-            bounds = Bounds(lower_bound, upper_bound)
-            res = minimize(hc_calc_method,
-                           x0,
-                           method='trust-constr',  #'L-BFGS-B',
-                           bounds=bounds,
-                           tol=tol,
-                           options={'disp': True})
-            if res.success:
-                print(res.message)
-                coord[i, 0] = getattr(self, quantity)(res.x)  # Evaluate ARE/POE at solution
-                coord[i, 1:] = np.exp(res.x)  # Convert lnSA to SA in units of g
-            else:
-                print(res.message)
-                coord[i, :] = np.nan
+        coord = np.empty( (nsol, 3+len(self.periods)) )
+        # coord[i,:] = [ ARE_OR_POE, N_ITER, N_FEV, SA_1, ..., SA_N]
+        smap = Starmap(_root_finding_worker)
+        #worker_args = (getattr(self, quantity), target, lower_bound, upper_bound, tol)
+        for i in range(nsol):
+            #smap.submit(worker_args)
+            smap.submit(getattr(self, quantity), target, lower_bound, upper_bound, tol)
+        i = 0
+        for res in smap:
+            logging.info('{}/{}: Convergence met for sample {} ({}={})'.format(
+                         i+1,nsol,np.exp(res.x),quantity,res.fun+target))
+            coord[i, 0] = res.fun+target  # Evaluate ARE/POE at solution
+            coord[i, 1] = res.nit
+            coord[i, 2] = res.nfev
+            coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
+            i = i + 1
         return coord
 
 
@@ -350,3 +351,35 @@ def _matrix_cell_worker(indices, fun, lnSA, monitor):
     result.update({'output': fun(lnSA)})
     return result
 
+
+def _root_finding_worker(fun, target, lb, ub, ftol, monitor):
+
+    def _cost_function(x, *args):
+        #func = args[0]
+        #target = args[1]
+        #low = args[2]
+        #upp = args[3]
+        #if np.any(x<low) or np.any(x>upp):
+        if np.any(x<lb) or np.any(x>ub):
+            cost = 1E6
+        else:
+            cost = np.abs(target-fun(x))
+        return cost
+
+    while True:
+        x0 = np.array([ np.random.uniform(l,0.3*u) for l,u in zip(lb,ub) ])
+        res = minimize(_cost_function,
+                       x0,
+                       method='Nelder-Mead',
+                       options={'fatol': ftol, 'disp': False})
+        qsol = _cost_function(res.x)
+        #qsol = _cost_function(res.x, fun, target, lb, ub)
+        #               args=(fun, target, lb, ub),
+        if res.success and (qsol<ftol):
+            logging.debug('Solution found')
+            logging.debug(res.message)
+            break
+        else:
+            logging.debug('Convergence not met or function evaluation not matching target')
+            logging.debug(res.message)
+    return res

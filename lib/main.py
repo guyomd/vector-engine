@@ -64,18 +64,16 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full'):
         else:
             raise ValueError('Unknown hazard curve quantity "{}"'.format(quantity))
 
-        n_sol = 10  # Number of vector-sample matching target
+        n_sol = oqparam.number_of_logic_tree_samples  # Number of vector-samples matching target POEs
         for trg in targets:
             logging.warning('Searching for pseudo-acceleration vector matching POE={}:'.format(trg))
             output = c.find_matching_vector_sample(trg,
                                                    quantity=quantity,
-                                                   tol=0.001,
-                                                   n_real=n_sol)
+                                                   nsol=n_sol)
             results_file = '{}_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
-            header_cols = [quantity.upper()] + [str(p) for p in c.periods]
+            header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
             savetxt(results_file, output, fmt='%.6e', delimiter=',', header=','.join(header_cols))
-            print(output)
 
     else:
         raise ValueError('Unknown calculation mode "{}"'.format(calc_mode))
