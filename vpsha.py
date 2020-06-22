@@ -62,17 +62,24 @@ else:
 
 if __name__ == "__main__":
     parallel.Starmap.init()
+
     if len(sys.argv)>2:
         calc_mode = sys.argv[2]
     else:
         calc_mode = "full"
+
+    if len(sys.argv)>3 and calc_mode=='optim':
+        n_runs = int(sys.argv[3])
+    else:
+        n_runs = 1
+
     try:
         logging.info('Setting up default settings for concurrent tasks')
         set_concurrent_tasks_default()
         t0 = time.time()
         logging.info('Starting VPSHA computation run on {}'.format(datetime.now()))
         job_ini = sys.argv[1]
-        run_job(job_ini, quantity='poe', calc_mode=calc_mode)
+        run_job(job_ini, quantity='poe', calc_mode=calc_mode, nb_runs=n_runs)
         logging.warning('Calculation finished correctly in {:.1f} seconds'.format(time.time()-t0))
     finally:
         parallel.Starmap.shutdown()
