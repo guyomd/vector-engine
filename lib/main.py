@@ -9,7 +9,7 @@ from openquake.commonlib.readinput import get_oqparam, get_imts
 from lib import imcm, mdhc, parser, calc  # IMPORT VPSHA MODULES
 
 
-def run_job(job_ini, quantity = 'poe', calc_mode = 'full'):
+def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
     """
     :param job_ini: str, path to Openquake configuration file (e.g. job.ini)
     :param quantity: str, quantity of interest: 'poe', 'are'
@@ -64,12 +64,11 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full'):
         else:
             raise ValueError('Unknown hazard curve quantity "{}"'.format(quantity))
 
-        n_sol = oqparam.number_of_logic_tree_samples  # Number of vector-samples matching target POEs
         for trg in targets:
             logging.warning('Searching for pseudo-acceleration vector matching POE={}:'.format(trg))
             output = c.find_matching_vector_sample(trg,
                                                    quantity=quantity,
-                                                   nsol=n_sol)
+                                                   nsol=nb_runs)
             results_file = '{}_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
             header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
