@@ -64,9 +64,8 @@ class VectorValuedCalculator():
         Returns the multivariate probability to exceed a specified set of
         ground motion acceleration levels
         """
-        lower = np.array(lnSA) # Natural logarithm of acceleration values
         abseps = 0.0001  # Documentation: Optimal value is 1E-6
-        maxpts = len(lower)*10  # Documentation: Optimal value is len(lower)*1000
+        maxpts = len(lnSA)*10  # Documentation: Optimal value is len(lnSA)*1000
         nsites = len(site_ctx)
         lnAVG = np.zeros((nsites,self.ndims))
         lnSTD = np.zeros(lnAVG.shape)
@@ -79,32 +78,44 @@ class VectorValuedCalculator():
                                                        [const.StdDev.TOTAL])
             lnAVG[:,i] = np.squeeze(means)
             lnSTD[:,i] = np.squeeze(stddevs[0])
+
+        mu = np.zeros((len(lnSA),))
         prob = np.zeros((nsites,))
         for j in range(nsites):
             # Build covariance matrix:
-            D = np.diag(lnSTD[j,:])
-            cov = D @ self.hc.corr @ D
-            lower_trunc = lnAVG[j,:]-self.truncation_level*np.sqrt(np.diag(cov))
-            upper_trunc = lnAVG[j,:]+self.truncation_level*np.sqrt(np.diag(cov))
+            #D = np.diag(lnSTD[j,:])
+            #cov = D @ self.hc.corr @ D
+            #lower_trunc = lnAVG[j,:]-self.truncation_level*np.sqrt(np.diag(cov))
+            #upper_trunc = lnAVG[j,:]+self.truncation_level*np.sqrt(np.diag(cov))
+            lower_trunc = -self.truncation_level*np.ones_like(mu)
+            upper_trunc = self.truncation_level*np.ones_like(mu)
+            lower = (np.array(lnSA) - lnAVG[j,:])/lnSTD[j,:] # Convert accel to epsilon
+            
             if np.any(lower >= upper_trunc):
                 # Requested value is above the 3-sigma truncature for at least one spectral period:
                 prob[j] = 0
-            else:
-                trunc_norm, _ = mvn.mvnun(lower_trunc,
+                continue
+
+            if np.any(lower <= lower_trunc):
+                indices = (lower <= lower_trunc).nonzero()
+                lower[indices] = -self.truncation_level
+          
+            trunc_norm, _ = mvn.mvnun(lower_trunc,
                                    upper_trunc,
-                                   lnAVG[j,:],
-                                   cov,
+                                   mu,
+                                   self.hc.corr,
                                    abseps=abseps,
                                    maxpts=maxpts)
 
-                prob[j], error = mvn.mvnun(lower,
+            prob[j], error = mvn.mvnun(lower,
                                   upper_trunc,
-                                  lnAVG[j,:],
-                                  cov,
+                                  mu,
+                                  self.hc.corr,
                                   abseps=abseps,
                                   maxpts=maxpts)
-                # Normalize poe over the truncation interval [-n*sigma, n*sigma]
-                prob[j] /= trunc_norm
+      
+            # Normalize poe over the truncation interval [-n*sigma, n*sigma]
+            prob[j] /= trunc_norm
         return prob
 
 
@@ -367,7 +378,7 @@ def _root_finding_worker(fun, target, lb, ub, ftol, monitor):
         return cost
 
     while True:
-        x0 = np.array([ np.random.uniform(l,0.3*u) for l,u in zip(lb,ub) ])
+        x0 = np.array([ np.random.uniform(l,0.5*u) for l,u in zip(lb,ub) ])
         res = minimize(_cost_function,
                        x0,
                        method='Nelder-Mead',
