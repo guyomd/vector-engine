@@ -340,13 +340,12 @@ class VectorValuedCalculator():
 
         coord = np.empty( (nsol, 3+len(self.periods)) )
         # coord[i,:] = [ ARE_OR_POE, N_ITER, N_FEV, SA_1, ..., SA_N]
-        smap = Starmap(_root_finding_worker)
-        #worker_args = (getattr(self, quantity), target, lower_bound, upper_bound, tol)
+        worker_args = list() 
         for i in range(nsol):
-            #smap.submit(worker_args)
-            smap.submit(getattr(self, quantity), target, lower_bound, upper_bound, tol)
+            worker_args.append((getattr(self, quantity), target, lower_bound, upper_bound, tol))
         i = 0
-        for res in smap:
+        for res in Starmap(_root_finder_worker, worker_args):
+            logging.info('Starting point: {}'.format(res.x0))
             logging.info('{}/{}: Convergence met for sample {} ({}={})'.format(
                          i+1,nsol,np.exp(res.x),quantity,res.fun+target))
             coord[i, 0] = res.fun+target  # Evaluate ARE/POE at solution
@@ -363,14 +362,9 @@ def _matrix_cell_worker(indices, fun, lnSA, monitor):
     return result
 
 
-def _root_finding_worker(fun, target, lb, ub, ftol, monitor):
+def _root_finder_worker(fun, target, lb, ub, ftol, monitor):
 
-    def _cost_function(x, *args):
-        #func = args[0]
-        #target = args[1]
-        #low = args[2]
-        #upp = args[3]
-        #if np.any(x<low) or np.any(x>upp):
+    def _cost_function(x):
         if np.any(x<lb) or np.any(x>ub):
             cost = 1E6
         else:
@@ -378,14 +372,13 @@ def _root_finding_worker(fun, target, lb, ub, ftol, monitor):
         return cost
 
     while True:
-        x0 = np.array([ np.random.uniform(l,0.5*u) for l,u in zip(lb,ub) ])
+        x0 = np.array([ np.random.uniform(l,u) for l,u in zip(lb,ub) ])
         res = minimize(_cost_function,
                        x0,
                        method='Nelder-Mead',
                        options={'fatol': ftol, 'disp': False})
         qsol = _cost_function(res.x)
-        #qsol = _cost_function(res.x, fun, target, lb, ub)
-        #               args=(fun, target, lb, ub),
+        res.x0 = x0
         if res.success and (qsol<ftol):
             logging.debug('Solution found')
             logging.debug(res.message)
