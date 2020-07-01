@@ -39,11 +39,31 @@ class VectorValuedCalculator():
                                                    sites_col, correlation_model,
                                                    oqparam.maximum_distance)
         self.ndims = len(oqparam.imtls.keys())
-        #self.periods = oqparam.imtls.keys()
         self.periods = get_imts(oqparam)
         self.sites = sites_col
         self.cm = correlation_model
         self.truncation_level = oqparam.truncation_level
+        self.integration_prms = {'abseps': 0.0001,  # Documentation: Optimal value is 1E-6 
+                                 'maxpts': self.ndims*10  # Documentation: Optimal value is len(lnSA)*1000
+                                }
+        self.integration_prms.update({'trunc_norm': self._truncation_normalization_factor()})
+
+
+    def _truncation_normalization_factor(self):
+        """
+        Returns the N-D normalization factor for the normal law integration
+        over the [ -n*std, +n*std ] domain
+        """
+        mu = np.zeros((self.ndims,))
+        lower_trunc = -self.truncation_level*np.ones_like(mu)
+        upper_trunc = self.truncation_level*np.ones_like(mu)
+        trunc_norm, _ = mvn.mvnun(lower_trunc,
+                                  upper_trunc,
+                                  mu,
+                                  self.hc.corr,
+                                  abseps=self.integration_prms['abseps'],
+                                  maxpts=self.integration_prms['maxpts'])
+        return trunc_norm
 
 
     def count_pointsources(self):
@@ -64,8 +84,6 @@ class VectorValuedCalculator():
         Returns the multivariate probability to exceed a specified set of
         ground motion acceleration levels
         """
-        abseps = 0.0001  # Documentation: Optimal value is 1E-6
-        maxpts = len(lnSA)*10  # Documentation: Optimal value is len(lnSA)*1000
         nsites = len(site_ctx)
         lnAVG = np.zeros((nsites,self.ndims))
         lnSTD = np.zeros(lnAVG.shape)
@@ -79,7 +97,7 @@ class VectorValuedCalculator():
             lnAVG[:,i] = np.squeeze(means)
             lnSTD[:,i] = np.squeeze(stddevs[0])
 
-        mu = np.zeros((len(lnSA),))
+        mu = np.zeros((self.ndims,))
         prob = np.zeros((nsites,))
         for j in range(nsites):
             # Build covariance matrix:
@@ -100,22 +118,16 @@ class VectorValuedCalculator():
                 indices = (lower <= lower_trunc).nonzero()
                 lower[indices] = -self.truncation_level
           
-            trunc_norm, _ = mvn.mvnun(lower_trunc,
-                                   upper_trunc,
-                                   mu,
-                                   self.hc.corr,
-                                   abseps=abseps,
-                                   maxpts=maxpts)
-
             prob[j], error = mvn.mvnun(lower,
                                   upper_trunc,
                                   mu,
                                   self.hc.corr,
-                                  abseps=abseps,
-                                  maxpts=maxpts)
+                                  abseps=self.integration_prms['abseps'],
+                                  maxpts=self.integration_prms['maxpts'])
       
             # Normalize poe over the truncation interval [-n*sigma, n*sigma]
-            prob[j] /= trunc_norm
+            prob[j] /= self.integration_prms['trunc_norm']
+
         return prob
 
 
@@ -342,7 +354,8 @@ class VectorValuedCalculator():
         # coord[i,:] = [ ARE_OR_POE, N_ITER, N_FEV, SA_1, ..., SA_N]
         worker_args = list() 
         for i in range(nsol):
-            worker_args.append((getattr(self, quantity), target, lower_bound, upper_bound, tol))
+            rs = np.random.RandomState(seed=np.random.random_integers(0,1E9))
+            worker_args.append((getattr(self, quantity), target, lower_bound, upper_bound, tol, rs))
         i = 0
         for res in Starmap(_root_finder_worker, worker_args):
             logging.info('Starting point: {}'.format(res.x0))
@@ -362,7 +375,7 @@ def _matrix_cell_worker(indices, fun, lnSA, monitor):
     return result
 
 
-def _root_finder_worker(fun, target, lb, ub, ftol, monitor):
+def _root_finder_worker(fun, target, lb, ub, ftol, rs, monitor):
 
     def _cost_function(x):
         if np.any(x<lb) or np.any(x>ub):
@@ -372,7 +385,7 @@ def _root_finder_worker(fun, target, lb, ub, ftol, monitor):
         return cost
 
     while True:
-        x0 = np.array([ np.random.uniform(l,u) for l,u in zip(lb,ub) ])
+        x0 = np.array([ rs.uniform(l,u) for l,u in zip(lb,ub) ])
         res = minimize(_cost_function,
                        x0,
                        method='Nelder-Mead',
