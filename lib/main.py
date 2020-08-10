@@ -6,7 +6,7 @@ from datetime import datetime
 
 from openquake.commonlib.readinput import get_oqparam, get_imts
 
-from lib import imcm, mdhc, parser, calc  # IMPORT VPSHA MODULES
+from lib import imcm, parser, calc  # IMPORT VPSHA MODULES
 
 
 def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
