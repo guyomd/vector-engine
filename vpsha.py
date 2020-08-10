@@ -17,7 +17,7 @@ from lib.main import run_job
 
 TERMINATE = config.distribution.terminate_workers_on_revoke
 OQ_DISTRIBUTE = parallel.oq_distribute()
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG, #logging.INFO,
                     format='[%(asctime)s] %(message)s') # In command-line "--log=INFO", other levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 logging.info('OQ_DISTRIBUTE set to "{}"'.format(OQ_DISTRIBUTE))
