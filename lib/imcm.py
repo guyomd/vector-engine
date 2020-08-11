@@ -50,6 +50,14 @@ class IntensityMeasureCorrelationModel():
 
 
 class BakerCornell2006(IntensityMeasureCorrelationModel):
+    """
+    Baker & cornell (2006) inter-spectral correlation model.
+    Records Database: PEER Strong Motion Database (2000)
+    Related GMPEs:
+            Abrahamson and Silva, 1997;
+            Boore et al., 1997;
+            Campbell, 1997
+    """
     def __init__(self):
         IntensityMeasureCorrelationModel.__init__(self)
         self.name = "BakerCornell2006"
@@ -72,3 +80,50 @@ class BakerCornell2006(IntensityMeasureCorrelationModel):
         else:
             r = 1 - np.cos(np.pi / 2 - 0.359 * np.log(Tmax / Tmin))
         return r
+
+
+class BakerJayaram2008(IntensityMeasureCorrelationModel):
+    """
+    Baker & Jayaram (2008) inter-spectral correlation model.
+    Records Database: NGA (Next Generation Attenuation project)
+    Related GMPEs:
+            Abrahamson and Silva, 2008;
+            Boore and Atkinson, 2008;
+            Campbell and Bozorgnia, 2008;
+            Chiou and Youngs, 2008
+    """
+    def __init__(self):
+        IntensityMeasureCorrelationModel.__init__(self)
+        self.name = "BakerJayaram2008"
+        self.imts = ('SA', 'SA')
+        self.units = ('s.', 's.')  # Periods in seconds
+        self.bounds = ((0.01, 10), (0.01, 10))
+
+    def rho(self, T1, T2):
+        """
+        Returns the correlation coefficient for ground-motions observed at two
+        different periods T1 and T2, based on the Baker & Jayaram (2008) study.
+        """
+        Tmin = min(T1, T2)
+        Tmax = max(T1, T2)
+        if (Tmin < 0.01) or (Tmax > 10):
+            raise ValueError('Periods are beyond the uppper/lower bounds of the {} model'.format(self.name))
+        else :
+            C1=1-np.cos(np.pi/2 -0.366*np.log(Tmax/max(Tmin,0.109)))
+            if Tmax<0.2:
+                C2=1-0.105*(1- 1/(1+np.exp(100*Tmax-5))) * ((Tmax-Tmin)/(Tmax-0.0099))
+            else:
+                C2=0
+            if Tmax<0.109:
+                C3=C2
+            else:
+                C3=C1
+            C4=C1 + 0.5*(np.sqrt(C3)-C3)*(1+np.cos(np.pi*Tmin/0.109))
+            if Tmax<0.109:
+                return C2
+            elif Tmin>0.109:
+                return C1
+            elif Tmax<0.2:
+                return min(C2,C4)
+            else :
+                return C4
