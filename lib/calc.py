@@ -202,8 +202,6 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         args_list = list()
-        #with hdf5new() as hdf5:
-            #smap = Starmap(self.pt_src_are.__func__, h5=hdf5)
         for rlz in self.ssm_lt:  # Loop over realizations
             _, weight = parser.get_value_and_weight_from_rlz(rlz)   
             srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
@@ -220,7 +218,6 @@ class VectorValuedCalculator():
                         pt_weight = weight*gsim_weight
                         args = (self, pt, gsim_model, pt_weight, lnSA)
                         args_list.append(args)
-                        #smap.submit(args)
 
             are = 0
             for value in Starmap(self.pt_src_are.__func__, args_list):
@@ -335,11 +332,12 @@ class VectorValuedCalculator():
         return self.hc
 
 
-    def find_matching_vector_sample(self, target, quantity='poe', tol=None, nsol=1):
+    def find_matching_poe_parallel_runs(self, target, quantity='poe', tol=None, nsol=1):
         """
         Returns a list of vector-valued coordinates corresponding to the Multi-Dimensional Hazard
         Curve ARE/POE value TARGET (within tolerance interval +/- TOL). This list of
-        coordinates is obtained using an optimization algorithm
+        coordinates is obtained using an optimization algorithm. Parallelization is realized by
+        sending one individual optimization run on each worker.
 
         :return: Coordinate of vector-sample with matching QUANTITY=TARGET
         """
@@ -367,6 +365,39 @@ class VectorValuedCalculator():
             coord[i, 2] = res.nfev
             coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
             i = i + 1
+        return coord
+
+
+    def find_matching_poe(self, target, quantity='poe', tol=None, nsol=1):
+        """
+        Returns a list of vector-valued coordinates corresponding to the Multi-Dimensional Hazard
+        Curve ARE/POE value TARGET (within tolerance interval +/- TOL). This list of
+        coordinates is obtained using an optimization algorithm. Parallelization is
+        realized by distributing individual AREs over each point source.
+
+        :return: Coordinate of vector-sample with matching QUANTITY=TARGET
+        """
+
+        # TOL: Tolerance on cost-function evaluation w/r to TARGET:
+        if tol is None:
+            tol = target/1E3
+
+        lower_bound = [np.log(min(self.oqparam.imtls[str(p)])) for p in self.periods]
+        upper_bound = [np.log(max(self.oqparam.imtls[str(p)])) for p in self.periods]
+
+        coord = np.empty( (nsol, 3+len(self.periods)) )
+        # NB: coord[i,:] = [ ARE_OR_POE, N_ITER, N_FEV, SA_1, ..., SA_N]
+        hc_calc_method = getattr(self, quantity+'_parallel')
+        for i in range(nsol):
+            rs = np.random.RandomState(seed=np.random.random_integers(0,1E9))
+            res = _root_finder_worker(hc_calc_method, target, lower_bound, upper_bound, tol, rs, None)
+            logging.info('Starting point: {}'.format(res.x0))
+            logging.info('{}/{}: Convergence met for sample {} ({}={})'.format(
+                i + 1, nsol, np.exp(res.x), quantity, res.fun + target))
+            coord[i, 0] = res.fun + target  # Evaluate ARE/POE at solution
+            coord[i, 1] = res.nit
+            coord[i, 2] = res.nfev
+            coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
         return coord
 
 
