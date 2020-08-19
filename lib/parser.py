@@ -7,6 +7,7 @@ from openquake.commonlib.readinput import (get_oqparam,
 from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.geo import Polygon, Point
+from openquake.hazardlib.calc.filters import SourceFilter
 
 def parse_openquake_ini(job_ini):
     """
@@ -30,13 +31,14 @@ def parse_openquake_ini(job_ini):
     return oqparam, ssm_lt, gsim_lt
 
 
-def get_sources_from_rlz(rlz, oqparam, ssm_lt):
+def get_sources_from_rlz(rlz, oqparam, ssm_lt, sourcefilter=None):
     """
     :param rlz: "openquake.commonlib.logictree.Realization" instance
     :param oqparam: "openquake.commonlib.oqvalidation.OqParam" instance
     :param ssm_lt: instance of class
                   "openquake.commonlib.logictree.SourceModelLogicTreeCollection"
-
+    :param sourcefilter: instance of class "openquake.hazardlib.calc.filters.SourceFilter", apply a filtering of seismic
+                         sources based a maximum integration distance. Default: None
     :return : a list of seismic sources instances, e.g.
                   "openquake.hazardlib.source.area.AreaSource"
     NOTE/ Incompatibility: method ssm_lt.apply_incertainties() has been removed in openquake.engine versions >= 3.9
@@ -51,13 +53,18 @@ def get_sources_from_rlz(rlz, oqparam, ssm_lt):
     ssm_fname = os.path.join(oqparam.base_path, rlz.value)
     # Read the source model
     ssm = to_python(ssm_fname, conv)
+    # Set-up filter if required:
+    if sourcefilter is None:
+        filter_func = lambda x: x # No filter
+    elif isinstance(sourcefilter, SourceFilter):
+        filter_func = sourcefilter.filter # filtering based on maximum integration distance
     # Loop over groups included in the source model
     sources = []
     for grp in ssm:
         # Update source group for the current realisation:
         updated_group = ssm_lt.apply_uncertainties(rlz.lt_path, grp)
         # Loop over sources:
-        for src in updated_group:
+        for src in filter_func(updated_group):
             sources.append(src)
     return sources
 

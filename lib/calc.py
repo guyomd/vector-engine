@@ -6,7 +6,7 @@ from scipy.stats import mvn
 from scipy.optimize import minimize, Bounds
 
 from openquake.hazardlib.contexts import ContextMaker, RuptureContext
-
+from openquake.hazardlib.calc.filters import SourceFilter
 from openquake.commonlib.readinput import get_gsim_lt, get_source_model_lt, get_imts
 from openquake.hazardlib import const
 
@@ -42,8 +42,9 @@ class VectorValuedCalculator():
         self.periods = get_imts(oqparam)
         self.sites = sites_col
         self.cm = correlation_model
-        self.truncation_level = oqparam.truncation_level
-        self.integration_prms = {'abseps': 0.0001,  # Documentation: Optimal value is 1E-6 
+        self.srcfilter = SourceFilter(sites_col, oqparam.maximum_distance)
+        self.integration_prms = {'truncation_level': oqparam.truncation_level,
+                                 'abseps': 0.0001,  # Documentation: Optimal value is 1E-6
                                  'maxpts': self.ndims*10  # Documentation: Optimal value is len(lnSA)*1000
                                 }
         self.integration_prms.update({'trunc_norm': self._truncation_normalization_factor()})
@@ -55,8 +56,8 @@ class VectorValuedCalculator():
         over the [ -n*std, +n*std ] domain
         """
         mu = np.zeros((self.ndims,))
-        lower_trunc = -self.truncation_level*np.ones_like(mu)
-        upper_trunc = self.truncation_level*np.ones_like(mu)
+        lower_trunc = -self.integration_prms['truncation_level']*np.ones_like(mu)
+        upper_trunc = self.integration_prms['truncation_level']*np.ones_like(mu)
         trunc_norm, _ = mvn.mvnun(lower_trunc,
                                   upper_trunc,
                                   mu,
@@ -72,9 +73,9 @@ class VectorValuedCalculator():
         """
         n = 0
         for rlz in self.ssm_lt:
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt)
+            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
             for src in srcs:
-                for _ in src:
+                for _ in self.srcfilter.filter(src):
                     n += 1
         return n
 
@@ -103,10 +104,10 @@ class VectorValuedCalculator():
             # Build covariance matrix:
             #D = np.diag(lnSTD[j,:])
             #cov = D @ self.hc.corr @ D
-            #lower_trunc = lnAVG[j,:]-self.truncation_level*np.sqrt(np.diag(cov))
-            #upper_trunc = lnAVG[j,:]+self.truncation_level*np.sqrt(np.diag(cov))
-            lower_trunc = -self.truncation_level*np.ones_like(mu)
-            upper_trunc = self.truncation_level*np.ones_like(mu)
+            #lower_trunc = lnAVG[j,:]-self.integration_prms['truncation_level']*np.sqrt(np.diag(cov))
+            #upper_trunc = lnAVG[j,:]+self.integration_prms['truncation_level']*np.sqrt(np.diag(cov))
+            lower_trunc = -self.integration_prms['truncation_level']*np.ones_like(mu)
+            upper_trunc = self.integration_prms['truncation_level']*np.ones_like(mu)
             lower = (np.array(lnSA) - lnAVG[j,:])/lnSTD[j,:] # Convert accel to epsilon
             
             if np.any(lower >= upper_trunc):
@@ -116,7 +117,7 @@ class VectorValuedCalculator():
 
             if np.any(lower <= lower_trunc):
                 indices = (lower <= lower_trunc).nonzero()
-                lower[indices] = -self.truncation_level
+                lower[indices] = -self.integration_prms['truncation_level']
           
             prob[j], error = mvn.mvnun(lower,
                                   upper_trunc,
@@ -180,11 +181,11 @@ class VectorValuedCalculator():
         are = 0
         for rlz in self.ssm_lt:  # Loop over realizations
             _, weight = parser.get_value_and_weight_from_rlz(rlz)
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt)
+            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
 
-            for src in srcs:  # Loop over seismic sources (area, fault, etc...)
+            for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
 
-                for pt in src:  # Loop over point-sources
+                for pt in self.srcfilter.filter(src):  # Loop over point-sources
 
                     gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
                     for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
@@ -205,11 +206,11 @@ class VectorValuedCalculator():
             #smap = Starmap(self.pt_src_are.__func__, h5=hdf5)
         for rlz in self.ssm_lt:  # Loop over realizations
             _, weight = parser.get_value_and_weight_from_rlz(rlz)   
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt)
+            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
 
-            for src in srcs:  # Loop over seismic sources (area, fault, etc...)
+            for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
 
-                for pt in src:  # Loop over point-sources
+                for pt in self.srcfilter.filter(src):  # Loop over point-sources
 
                     gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
                     for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
