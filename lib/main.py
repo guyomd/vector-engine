@@ -54,6 +54,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
                        '{}.hdf5'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
         with h5py.File(results_file, 'w') as h5f:
             h5f.create_dataset('output', data=hc.hazard_matrix)
+            h5f.create_dataset('imtls', data=oqparam.imtls)
 
     elif calc_mode.lower()=='optim':
         # Find POE by multi-dimensional optimization (e.g. Simplex method, Newton-Raphson method etc...)
