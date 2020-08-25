@@ -58,6 +58,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
                 dset.attrs[str(p)] = oqparam.imtls[p]
 
     elif calc_mode.lower()=='optim':
+
         # Find POE by multi-dimensional optimization (e.g. Simplex method, Newton-Raphson method etc...)
         if quantity.lower()=='are':
             targets = calc.poe2are(oqparam.poes)
