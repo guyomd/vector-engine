@@ -1,7 +1,7 @@
 import h5py
 import time
 import logging
-from numpy import savetxt
+from numpy import savetxt, array
 from datetime import datetime
 
 from openquake.commonlib.readinput import get_oqparam, get_imts
@@ -53,8 +53,9 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
         results_file = '{}_'.format(quantity) + \
                        '{}.hdf5'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
         with h5py.File(results_file, 'w') as h5f:
-            h5f.create_dataset('output', data=hc.hazard_matrix)
-            h5f.create_dataset('imtls', data=oqparam.imtls)
+            dset = h5f.create_dataset('output', data=hc.hazard_matrix)
+            for p in oqparam.imtls.keys():
+                dset.attrs[str(p)] = oqparam.imtls[p]
 
     elif calc_mode.lower()=='optim':
         # Find POE by multi-dimensional optimization (e.g. Simplex method, Newton-Raphson method etc...)
