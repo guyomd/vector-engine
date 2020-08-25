@@ -53,7 +53,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
         results_file = '{}_'.format(quantity) + \
                        '{}.hdf5'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
         with h5py.File(results_file, 'w') as h5f:
-            dset = h5f.create_dataset('hazard_matrix', data=hc.hazard_matrix)
+            dset = h5f.create_dataset('output', data=hc.hazard_matrix)
             for p in oqparam.imtls.keys():
                 dset.attrs[str(p)] = oqparam.imtls[p]
 
