@@ -29,26 +29,28 @@ def integrationND(arr, x):
     return integ
 
 
-def poe2pdf(m, x):
+def poe2pdf(m, x, diff_option='diff'):
     ndim = len(m.shape)
     pdf = deepcopy(m)
     shape = np.array(m.shape)
     for k in range(ndim):
+        if diff_option == 'gradient':
+            pdf = -np.gradient(pdf, x[k], axis=k)
+        elif diff_option == 'diff':
+            shape[k] -= 1
+            xmat = np.meshgrid(*x, indexing='ij')[k]
+            pdf = -np.diff(pdf, 1, axis=k)/np.diff(xmat, 1, axis=k)
+            xx = list()
+            for j in range(ndim):
+                if j==k:
+                    xx.append(np.array(x[k][0:-1]+0.5*np.diff(x[k])))
+                else:
+                    xx.append(x[j])
+            x = xx
+        else:
+            raise ValueError(f'Unrecognized "diff_option" value: {diff_option}')
 
-        pdf = -np.gradient(pdf, x[k], axis=k)
-        """
-        shape[k] -= 1
-        xmat = np.meshgrid(*x, indexing='ij')[k]
-        pdf = -np.diff(pdf, 1, axis=k)/np.diff(xmat, 1, axis=k)
-        xx = list()
-        for j in range(ndim):
-            if j==k:
-                xx.append(np.array(x[k][0:-1]+0.5*np.diff(x[k])))
-            else:
-                xx.append(x[j])
-        x = xx
-        """
-        plot_matrix(pdf, x[0], x[1], f'$log_{{{10}}}$ {periods[0]}', periods[1], f'POE integrated along axe {k}', ndigits_labels=4)
+        plot_matrix(pdf, x[0], x[1], f'ln {periods[0]})', f'ln {periods[1]}', f'POE integrated along axe {k}', ndigits_labels=4)
     return pdf, x
 
 
@@ -90,7 +92,7 @@ def pdf2poe1D(pdf, x):
 
 #h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D_20200812/poe_2020-08-12T105335.hdf5"
 #job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D_20200812/job_4D.ini'
-h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/poe_2020-08-10T174616.hdf5"
+h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/2D_Curve/poe_2D_1s_0.05s.hdf5"
 job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/AreaSourceClassicalPSHA/modified_job_2D.ini'
 
 ref_hzd_curves = {
@@ -111,36 +113,35 @@ imtls = oq.imtls
 per = oq.imtls.keys()
 periods = list(per)
 
+# Warning: For a proper integration, log of acceleration values should be used!
+#          (to be coherent with the integration space used in poe_gm() method)
 logx = np.array([ np.log(imtls[p]) for p in per ])
-x = np.array([ imtls[p] for p in per ])
+x = np.log(np.array([ imtls[p] for p in per ]))
 
-x = logx
-
-plot_matrix(mat, x[0], x[1], periods[0], periods[1], 'Prob. of exceedance', ndigits_labels=4)
+plot_matrix(mat, x[0], x[1], f'ln {periods[0]}', f'ln {periods[1]}', 'Prob. of exceedance', ndigits_labels=4)
 
 
-pdf, x2 = poe2pdf(mat, x)
+pdf, xmid = poe2pdf(mat, x)
 plt.show()
-sumpdf = integrationND(pdf, x2)
+sumpdf = integrationND(pdf, xmid)
 
 normalize_pdf = False
 print(f'Sum of {nd}-D PDF before normalization: {sumpdf}')
 if normalize_pdf:
     pdf = pdf/sumpdf
-    print(f'Sum after normalization: {integrationND(pdf, x2)}')
+    print(f'Sum after normalization: {integrationND(pdf, xmid)}')
 
-margs = marginals1D(pdf, x2)
-# Test N-D integration:
-# marginals1D(np.ones((5,4,5,4)), [np.arange(5), np.arange(4), np.arange(5), np.arange(4)], axis=None)
-
-# POE for 1-D marginals are calculated BELOW in the for loop below for each period
+marg_pdf = marginals1D(pdf, xmid)
+marg_poe = list()
+for k in range(len(marg_pdf)):
+    marg_poe.append( pdf2poe1D(marg_pdf[k], xmid[k]) )
 
 
 ### PLOTS ###
 """
 plt.Figure()
 for i in range(len(periods)):
-    plt.loglog(x[i],margs[i],label=str(periods[i]))
+    plt.semilogy(xmid[i],margs[i],label=str(periods[i]))
 plt.legend()
 plt.show()
 """
@@ -150,10 +151,14 @@ for i in range(len(periods)):
     ref_curve_x = oqtmp.imtls[periods[i]]
     ref_curve_x = np.log(ref_curve_x)
     plt.Figure()
-    plt.plot(x2[i],margs[i],label='PDF')
-    poe = pdf2poe1D(margs[i], x2[i])
-    plt.plot(x2[i],poe, label='POE')
+    # Reference POE obtained by a separate VPSHA 1-D:
     plt.plot(ref_curve_x, ref_curve, label='1-D ref.')
+    # 1-D marginal PDF from the N-D calculation:
+    hc = plt.plot(xmid[i],marg_pdf[i], ls=':', lw = 1, label='PDF')
+    # 1-D marginal POE from the N-D calculation:
+    plt.plot(xmid[i],marg_poe[i], color = hc[-1].get_color(),
+             ls='-', marker=None, fillstyle='full', label='POE')
+    plt.xlabel('ln(PSA in g)')
     plt.yscale('linear')
     plt.xscale('linear')
     plt.title(str(periods[i]))
@@ -171,8 +176,5 @@ if len(pdf.shape)==2:
     plt.colorbar()
     plt.show()
 
-for p in per:
-    # Build marginal pdf for one single spectral period:
-    pass
 
 
