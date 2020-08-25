@@ -12,7 +12,7 @@ from plotutils import plot_matrix
 
 def read_hzd_curve(hdf5file):
     with h5py.File(hdf5file, 'r') as f:
-        allsites_mat = f.get('output')[()]
+        allsites_mat = f.get('hazard_matrix')[()]
         # Matrix shape is [Nsites, Nper1, ..., Nperk):
         assert allsites_mat.shape[0] == 1 # Only one site permitted
         return np.squeeze(allsites_mat)
