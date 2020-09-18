@@ -332,7 +332,7 @@ class VectorValuedCalculator():
         return self.hc
 
 
-    def find_matching_poe_parallel_runs(self, target, quantity='poe', tol=None, nsol=1):
+    def find_matching_poe_parallel_runs(self, target, quantity='poe', tol=None, nsol=1, outputfile=None):
         """
         Returns a list of vector-valued coordinates corresponding to the Multi-Dimensional Hazard
         Curve ARE/POE value TARGET (within tolerance interval +/- TOL). This list of
@@ -365,10 +365,11 @@ class VectorValuedCalculator():
             coord[i, 2] = res.nfev
             coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
             i = i + 1
-        return coord
+        with open(outputfile, 'ab') as f:
+            np.savetxt(f, coord, fmt='%.6e', delimiter=',')
 
 
-    def find_matching_poe(self, target, quantity='poe', tol=None, nsol=1):
+    def find_matching_poe(self, target, quantity='poe', tol=None, nsol=1, outputfile=None):
         """
         Returns a list of vector-valued coordinates corresponding to the Multi-Dimensional Hazard
         Curve ARE/POE value TARGET (within tolerance interval +/- TOL). This list of
@@ -398,7 +399,8 @@ class VectorValuedCalculator():
             coord[i, 1] = res.nit
             coord[i, 2] = res.nfev
             coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
-        return coord
+            with open(outputfile, 'ab') as f:
+                np.savetxt(f, coord[i,:], fmt='%.6e', delimiter=',')
 
 
 def _matrix_cell_worker(indices, fun, lnSA, monitor):

@@ -70,11 +70,13 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
         for trg in targets:
             logging.warning('Searching for pseudo-acceleration vector matching POE={}:'.format(trg))
             optimization_method = c.find_matching_poe # c.find_matching_poe_parallel_runs
-            output = optimization_method(trg, quantity=quantity, nsol=nb_runs)
             results_file = '{}_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
             header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
-            savetxt(results_file, output, fmt='%.6e', delimiter=',', header=','.join(header_cols))
+            with open(results_file, 't') as f:
+                # Write header:
+                f.write(','.join(header_cols)+'\n')
+            optimization_method(trg, quantity=quantity, nsol=nb_runs, outputfile=results_file)
 
     else:
         raise ValueError('Unknown calculation mode "{}"'.format(calc_mode))

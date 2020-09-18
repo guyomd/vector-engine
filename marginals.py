@@ -29,7 +29,7 @@ def integrationND(arr, x):
     return integ
 
 
-def poe2pdf(m, x, diff_option='diff'):
+def poe2pdf(m, x, diff_option='diff', plot=False):
     ndim = len(m.shape)
     pdf = deepcopy(m)
     shape = np.array(m.shape)
@@ -50,7 +50,8 @@ def poe2pdf(m, x, diff_option='diff'):
         else:
             raise ValueError(f'Unrecognized "diff_option" value: {diff_option}')
 
-        plot_matrix(pdf, x[0], x[1], f'ln {periods[0]})', f'ln {periods[1]}', f'POE integrated along axe {k}', ndigits_labels=4)
+        if plot:
+            plot_matrix(pdf, x[0], x[1], f'ln {periods[0]})', f'ln {periods[1]}', f'POE integrated along axe {k}', ndigits_labels=4)
     return pdf, x
 
 
@@ -90,8 +91,8 @@ def pdf2poe1D(pdf, x):
 
 #### MAIN PART OF SCRIPT STARTS HERE !!! ####
 
-#h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D_20200812/poe_2020-08-12T105335.hdf5"
-#job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D_20200812/job_4D.ini'
+"""
+# 2-D case!
 h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/2D_Curve/poe_2D_1s_0.05s.hdf5"
 job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/AreaSourceClassicalPSHA/modified_job_2D.ini'
 
@@ -103,6 +104,53 @@ ref_hzd_curves = {
         'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/1D_Curves/poe_1D_1s.hdf5',
         'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_2D/AreaSourceClassicalPSHA/modified_job_1D_1s.ini'}
 }
+plot2D_matrix = True
+"""
+"""
+# 4-D case!
+h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/4D_Curve/poe_4D_3s_1s_0.2s_0.05s.hdf5"
+job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/modified_job_4D.ini'
+
+ref_hzd_curves = {
+    'SA(0.05)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/1D_Curves/poe_1D_0.05s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/modified_job_1D_0.05s.ini'},
+    'SA(0.2)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/1D_Curves/poe_1D_0.2s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/modified_job_1D_0.2s.ini'},
+    'SA(1.0)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/1D_Curves/poe_1D_1s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/modified_job_1D_1s.ini'},
+    'SA(3.0)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/1D_Curves/poe_1D_3s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_4D/modified_job_1D_3s.ini'}
+}
+plot2D_matrix = False
+"""
+
+# 4-D case!
+h5file = "/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/5D_Curve/poe_2020-08-28T230505.hdf5"
+job_ini = '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_5D.ini'
+
+ref_hzd_curves = {
+    'SA(0.05)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/1D_Curves/poe_1D_0.05s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_1D_0.05s.ini'},
+    'SA(0.2)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/1D_Curves/poe_1D_0.2s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_1D_0.2s.ini'},
+    'SA(0.1)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/1D_Curves/poe_1D_0.1s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_1D_0.1s.ini'},
+    'SA(1.0)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/1D_Curves/poe_1D_1s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_1D_1s.ini'},
+    'SA(3.0)': {
+        'hdf5': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/1D_Curves/poe_1D_3s.hdf5',
+        'ini': '/home/b94678/Calculs/vectorValuedPSHA/vpsha-data/test_5D/AreaSourceClassicalPSHA/modified_job_1D_3s.ini'}
+}
+plot2D_matrix = False
+
 
 mat = read_hzd_curve(h5file)
 nd = len(mat.shape)
@@ -118,10 +166,11 @@ periods = list(per)
 logx = np.array([ np.log(imtls[p]) for p in per ])
 x = np.log(np.array([ imtls[p] for p in per ]))
 
-plot_matrix(mat, x[0], x[1], f'ln {periods[0]}', f'ln {periods[1]}', 'Prob. of exceedance', ndigits_labels=4)
+if plot2D_matrix:
+    plot_matrix(mat, x[0], x[1], f'ln {periods[0]}', f'ln {periods[1]}', 'Prob. of exceedance', ndigits_labels=4)
 
 
-pdf, xmid = poe2pdf(mat, x)
+pdf, xmid = poe2pdf(mat, x, diff_option='gradient', plot=plot2D_matrix)
 plt.show()
 sumpdf = integrationND(pdf, xmid)
 
@@ -150,20 +199,31 @@ for i in range(len(periods)):
     oqtmp = get_oqparam(ref_hzd_curves[str(periods[i])]['ini'])
     ref_curve_x = oqtmp.imtls[periods[i]]
     ref_curve_x = np.log(ref_curve_x)
-    plt.Figure()
+    fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True)
     # Reference POE obtained by a separate VPSHA 1-D:
-    plt.plot(ref_curve_x, ref_curve, label='1-D ref.')
+    ax[0].plot(ref_curve_x, ref_curve, label='1-D ref.')
     # 1-D marginal PDF from the N-D calculation:
-    hc = plt.plot(xmid[i],marg_pdf[i], ls=':', lw = 1, label='PDF')
+    hc = ax[0].plot(xmid[i],marg_pdf[i], ls=':', lw = 1, label='PDF')
     # 1-D marginal POE from the N-D calculation:
-    plt.plot(xmid[i],marg_poe[i], color = hc[-1].get_color(),
+    ax[0].plot(xmid[i],marg_poe[i], color = hc[-1].get_color(),
              ls='-', marker=None, fillstyle='full', label='POE')
-    plt.xlabel('ln(PSA in g)')
-    plt.yscale('linear')
-    plt.xscale('linear')
-    plt.title(str(periods[i]))
-    plt.legend()
-    plt.grid(True)
+    ax[0].set_xlabel('ln(PSA in g)')
+    ax[0].set_yscale('linear')
+    ax[0].set_xscale('linear')
+    ax[0].set_title(str(periods[i]))
+    ax[0].legend()
+    ax[0].grid(True)
+
+    # Check differences:
+    #ax[1].plot(ref_curve_x, (marg_poe[i]-ref_curve)/ref_curve, 'k--',
+    #           marker=None, fillstyle='full', label='Rel. error')
+    ax[1].plot(ref_curve_x, marg_poe[i] - ref_curve, 'k-',
+               marker=None, fillstyle='full', label='Abs. error')
+    ax[1].set_xlabel('ln(PSA in g)')
+    ax[1].grid(True)
+    ax[1].legend()
+
+
     plt.show()
 
 
