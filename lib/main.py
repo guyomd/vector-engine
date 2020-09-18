@@ -73,7 +73,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
             results_file = '{}_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
             header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
-            with open(results_file, 't') as f:
+            with open(results_file, 'w') as f:
                 # Write header:
                 f.write(','.join(header_cols)+'\n')
             optimization_method(trg, quantity=quantity, nsol=nb_runs, outputfile=results_file)
