@@ -400,7 +400,7 @@ class VectorValuedCalculator():
             coord[i, 2] = res.nfev
             coord[i, 3:] = np.exp(res.x)  # Convert lnSA to SA in units of g
             with open(outputfile, 'ab') as f:
-                np.savetxt(f, coord[i,:], fmt='%.6e', delimiter=',')
+                np.savetxt(f, coord[i,:][np.newaxis,:], fmt='%.6e', delimiter=',')
 
 
 def _matrix_cell_worker(indices, fun, lnSA, monitor):
