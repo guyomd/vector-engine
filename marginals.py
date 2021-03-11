@@ -4,11 +4,11 @@ import numpy as np
 # np.ndindex() iterator ovre multi_index for each matrix element
 # np.apply_over_axes()
 
-from scipy.integrate import cumtrapz, simps
+from scipy.integrate import simps
 from copy import deepcopy
 from openquake.commonlib.readinput import get_oqparam
 from matplotlib import pyplot as plt
-from plotutils import plot_matrix
+from lib.plotutils import plot_matrix
 
 def read_hzd_curve(hdf5file):
     with h5py.File(hdf5file, 'r') as f:

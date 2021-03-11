@@ -1,5 +1,5 @@
 from matplotlib import pyplot as plt
-from plotutils import plot_matrix
+from lib.plotutils import plot_matrix
 import sys
 import h5py
 import numpy as np

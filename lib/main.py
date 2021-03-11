@@ -6,15 +6,20 @@ from datetime import datetime
 
 from openquake.commonlib.readinput import get_oqparam, get_imts
 
-from lib import imcm, parser, calc  # IMPORT VPSHA MODULES
+from vengine.lib import imcm, parser, calc  # IMPORT VPSHA MODULES
 
 
-def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
+def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.BakerCornell2006()):
     """
     :param job_ini: str, path to Openquake configuration file (e.g. job.ini)
     :param quantity: str, quantity of interest: 'poe', 'are'
     :param calc_mode: str, calculation mode: Full hazard matrix computation ("full"),
                            or optimized search for vector samples matching POE/ARE ("optim")
+    :param nb_runs: int, number of repetitive optimisation runs requested to
+                         produce a set of solutions. If calc_mode=="full",
+                         this option has no effect (=1).
+    :param cm: imcm.IntensityMeasureCorrelationModel instance.
+               Inter-intensity correlation model.
     """
     start_time = time.time()
 
@@ -23,10 +28,6 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1):
 
     # Get the list of Tectonic Region Types :
     trt = oqparam._gsims_by_trt.keys()
-
-    # Set the Ground-motion correlation model:
-    # exists in Openquake :ground_motion_correlation_model
-    cm = imcm.BakerCornell2006()
 
     # Manage the target sites specification, as site, site-collection or as a region:
     sites_col = parser.parse_sites(oqparam)
