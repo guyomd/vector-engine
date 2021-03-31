@@ -120,6 +120,7 @@ def plot_marginals(hdf5file, job_ini, refcurves=None, savedir=None, **kwargs):
             fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
 
         # 1-D marginal PDF from the N-D calculation:
+        xmid = logx[i][:-1]+0.5*(logx[i][1:]-logx[i][:-1])
         hc = ax[0].plot(xmid[i], marg_pdf[i], ls=':', lw=1, label='PDF')
         # 1-D marginal POE from the N-D calculation:
         ax[0].plot(xmid[i], marg_poe[i], color=hc[-1].get_color(),
