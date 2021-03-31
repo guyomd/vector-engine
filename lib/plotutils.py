@@ -1,7 +1,12 @@
 import sys
+import os
 from math import ceil
 from matplotlib import pyplot as plt
 import numpy as np
+from vengine.lib.parser import get_matrix_values_and_axes, read_hzd_matrix
+from vengine.lib.marginals import build_marginals, poe2pdf
+from openquake.commonlib.readinput import get_oqparam
+
 
 def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False):
     if isinstance(h, plt.Axes):
@@ -22,6 +27,7 @@ def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False):
     print(f'Figure saved in {filename}')
     if not keep_opened:
         plt.close(h.number)
+
 
 def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=2):
     def extents(f):
@@ -46,6 +52,90 @@ def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=
     cb = plt.colorbar()
     if cbar_title is not None:
         cb.ax.set_title(cbar_title)
+
+
+def plot_marginals(hdf5file, job_ini, refcurves=None, savedir=None, **kwargs):
+    """
+    Build plot of unidimensional marginal PDF or POE for each period involved in the N-D calculation
+
+    :param hdf5file: str, path to the HDF5 containing the N-D hazard matrix results
+    :param job_ini: str, path to OQ configuration file (e.g. job.ini)
+    :param refcurves: dict, dictionary of reference hazard curves, used for visual comparison
+                            with computed marginals. Dictionary keys should match periods read
+                            in the HDF5 file,  and dictionary values are sub-dict with keys ['hdf5', 'ini']:
+                            e.g. refcurves = {
+                                     'SA(0.1)': {'hdf5': 'path/to/hdf5', 'ini': 'path/to/job.ini'}
+                                     'PGA': {'hdf5': 'path/to/hdf5', 'ini': 'path/to/job.ini'}
+                                     }
+    :param savedir: str, directory path for saved figures. If None, figures are not saved (default: ./).
+    :param normalize: logical, specify whether N-D PDF should be normalized (default: False)
+
+    """
+    mat, periods, logx, x = get_matrix_values_and_axes(hdf5file, job_ini)
+
+    nd = len(mat.shape)
+    if nd == 2:
+        # Add special plots for the 2-D case:
+        pdf, xmid = poe2pdf(mat, logx, diff_option='gradient')
+        plt.show()
+        plot_matrix(mat, logx[0], logx[1],
+                    f'ln {periods[0]}',
+                    f'ln {periods[1]}',
+                    'Probability of exceedance',
+                    ndigits_labels=4)
+        plot_matrix(pdf, logx[0], logx[1],
+                    f'ln {periods[0]})',
+                    f'ln {periods[1]}',
+                    'Probability Density function',
+                    ndigits_labels=4)
+        """
+        plt.Figure()
+        plt.imshow(pdf)
+        plt.colorbar()
+        plt.show()
+        """
+
+    marg_poe, marg_pdf = build_marginals(mat, logx, **kwargs)
+
+    for i in range(len(periods)):
+        period = str(periods[i])
+
+        if (refcurves is not None) and (period in list(refcurves.keys())):
+            ref = read_hzd_matrix(refcurves[period]['hdf5'])
+            oqtmp = get_oqparam(refcurves[period]['ini'])
+            ref_x = np.log(oqtmp.imtls[periods[i]])
+            fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True)
+            # Reference 1-D hazard curve:
+            ax[0].plot(ref_x, ref, label='1-D ref.')
+
+            # Plot differences:
+            # ax[1].plot(ref_x, (marg_poe[i]-ref)/ref, 'k--',
+            #           marker=None, fillstyle='full', label='Rel. error')
+            ax[1].plot(ref_x, marg_poe[i] - ref, 'k-',
+                       marker=None, fillstyle='full', label='Abs. error')
+            ax[1].set_xlabel('ln(PSA in g)')
+            ax[1].grid(True)
+            ax[1].legend()
+        else:
+            fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
+
+        # 1-D marginal PDF from the N-D calculation:
+        hc = ax[0].plot(xmid[i], marg_pdf[i], ls=':', lw=1, label='PDF')
+        # 1-D marginal POE from the N-D calculation:
+        ax[0].plot(xmid[i], marg_poe[i], color=hc[-1].get_color(),
+                   ls='-', marker=None, fillstyle='full', label='POE')
+        ax[0].set_xlabel('ln(PSA in g)')
+        ax[0].set_yscale('log')
+        ax[0].set_xscale('linear')
+        ax[0].set_title(period)
+        ax[0].legend()
+        ax[0].grid(True)
+
+        if savedir is None:
+            plt.show()
+        else:
+            filename = savedir+os.sep+f'marginal_{period}.tif'
+            save_plot(filename, h=None, size=(8, 6), keep_opened=False, tight=False)
 
 
 class ProgressBar():
