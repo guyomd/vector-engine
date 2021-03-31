@@ -8,6 +8,9 @@ from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.geo import Polygon, Point
 from openquake.hazardlib.calc.filters import SourceFilter
+import h5py
+import numpy as np
+
 
 def parse_openquake_ini(job_ini):
     """
@@ -106,3 +109,25 @@ def parse_sites(oqparam):
         assert isinstance(oqparam.sites, SiteCollection)
         sites_col = oqparam.sites
     return sites_col
+
+
+def read_hzd_matrix(hdf5file):
+    with h5py.File(hdf5file, 'r') as f:
+        allsites_mat = f.get('hazard_matrix')[()]
+        # Matrix shape is [Nsites, Nper1, ..., Nperk):
+        assert allsites_mat.shape[0] == 1  # Only one site permitted
+        return np.squeeze(allsites_mat)
+
+
+def get_matrix_values_and_axes(hdf5file, job_ini):
+    mat = read_hzd_matrix(hdf5file)
+    oq = get_oqparam(job_ini)
+    imtls = oq.imtls
+    per = oq.imtls.keys()
+    periods = list(per)
+
+    # Warning: For a proper integration, log of acceleration values should be used!
+    #          (to be coherent with the integration space used in poe_gm() method)
+    logx = np.array([np.log(imtls[p]) for p in per])
+    x = np.log(np.array([imtls[p] for p in per]))
+    return mat, periods, logx, x
