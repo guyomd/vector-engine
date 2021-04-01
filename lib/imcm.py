@@ -128,7 +128,7 @@ class BakerJayaram2008(IntensityMeasureCorrelationModel):
             else :
                 return C4
 
-class TraversaBremaud2008(IntensityMeasureCorrelationModel):
+class TraversaBremaud2020(IntensityMeasureCorrelationModel):
     """
     Traversa & Bremaud (2020, unpublished) inter-spectral correlation model.
     Records Database: RESORCE, 2019 edition
