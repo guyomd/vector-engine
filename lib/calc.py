@@ -242,7 +242,7 @@ class VectorValuedCalculator():
         are = self.are_parallel(lnSA)
         return 1-np.exp(-are*self.oqparam.investigation_time)
 
-    def hazard_matrix(self, quantity='poe'):
+    def hazard_matrix_calculation(self, quantity='poe'):
         """
         Compute exhaustively the full VPSHA hazard matrix of ARE/POE over the N-dimensional space of
         spectral periods or parameters.
@@ -254,8 +254,8 @@ class VectorValuedCalculator():
         hc_calc_method = getattr(self, quantity+'_parallel')  # self.poe or self.are method
         shape = (len(self.sites),) + tuple(len(self.oqparam.imtls[str(p)]) for p in self.periods)
         max_nb = np.prod(shape)
-        logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
-        logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
+        logging.warning('hazard matrix shape: [N_sites x N_IMT_1 x ... x N_IMT_k]: {}'.format(shape))
+        logging.warning('hazard matrix has {} elements'.format(max_nb))
 
         output = np.empty(shape)
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
@@ -277,7 +277,7 @@ class VectorValuedCalculator():
         self.hc.hazard_matrix = output
         return self.hc
 
-    def hazard_matrix_parallel(self, quantity='poe'):
+    def hazard_matrix_calculation_parallel(self, quantity='poe'):
         """
         Compute exhaustively the full VPSHA hazard matrix of ARE/POE over the N-dimensional space of
         spectral periods or parameters.
@@ -291,8 +291,8 @@ class VectorValuedCalculator():
         shape = (len(self.sites),) + tuple(len(self.oqparam.imtls[str(p)]) for p in self.periods)
         max_nb = np.prod(shape)
 
-        logging.warning('\nVPSHA matrix shape: [N_sites x N period_1 x ... x N period_k]: {}\n'.format(shape))
-        logging.warning('VPSHA matrix  matrix has {} elements'.format(max_nb))
+        logging.warning('hazard matrix shape: [N_sites x N_IMT_1 x ... x N_IMT_k]: {}'.format(shape))
+        logging.warning('hazard matrix has {} elements'.format(max_nb))
 
         acc_discretization = [np.log(self.oqparam.imtls[str(p)]) for p in self.periods]
 

@@ -3,10 +3,12 @@ import time
 import logging
 from numpy import savetxt, array
 from datetime import datetime
+from copy import deepcopy
 
+from openquake.baselib.general import DictArray
 from openquake.commonlib.readinput import get_oqparam, get_imts
 
-from vengine.lib import imcm, parser, calc  # IMPORT VPSHA MODULES
+from vengine.lib import imcm, parser, calc, plotutils  # IMPORT VPSHA MODULES
 
 
 def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.BakerCornell2006()):
@@ -43,12 +45,53 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
     npts = c.count_pointsources()
     logging.info('\nNumber of point-sources: {}'.format(npts))
 
-    if calc_mode.lower()=="full":
+    if calc_mode.lower() == "check-marginals":
+        # First, run computation on 1-D PSHA for each period, and then run a "full" mode
+        # N-D calculation and compute marginal 1-D hazard curves for comparison:
+
+        # Suite of independent 1-D calculations:
+        print(f'\n# STEP 1/4: Compute unidimensional hazard curves for all periods')
+        nd = len(oqparam.imtls.keys())
+        ref1D = dict()
+        for key in list(oqparam.imtls.keys()):
+            print(f'### IMT: {str(key)} ###')
+            # Initialize pqrm1D as a copy of oqparam:
+            oqprm1D = deepcopy(oqparam)
+            # Then, select only one IMT:
+            oqprm1D.hazard_imtls = {str(key): oqparam.imtls[key].tolist()}
+            c1D = calc.VectorValuedCalculator(oqprm1D, sites_col, cm)
+            hc1D = c1D.hazard_matrix_calculation_parallel(quantity=quantity)
+            ref1D[key] = {'imtls': deepcopy(oqprm1D.hazard_imtls),
+                          'data': deepcopy(hc1D.hazard_matrix)}
+
+        # N-D hazard matrix computation:
+        print(f'\n# STEP 2/4 Compute N-dimensional hazard matrix')
+        hc = c.hazard_matrix_calculation_parallel(quantity=quantity)
+
+        # # Compute marginals:
+        # marg_poe, marg_pdf = hc.hazard_matrix.compute_marginals()
+
+        # Save all matrix/curves in HDF5:
+        print(f'\n# STEP 3/4 Save results in HDF5 archive')
+        results_file = '{}_with_marginals_'.format(quantity) + \
+                       '{}.hdf5'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':', '')
+        with h5py.File(results_file, 'w') as h5f:
+            dset = h5f.create_dataset('hazard_matrix', data=hc.hazard_matrix)
+            for p in oqparam.imtls.keys():
+                dset.attrs[p] = oqparam.imtls[p]
+                dset1D = h5f.create_dataset(f'hazard_curve_{str(p)}', data=ref1D[key]['data'])
+                dset1D.attrs[p] = array(ref1D[p]['imtls'][p])
+
+        # Produce plots and save them:
+        print(f'\n# STEP 4/4 Make plots and save to current directory')
+        plotutils.plot_marginals(hc.hazard_matrix, oqparam.imtls, refcurves=ref1D, savedir='./')
+
+    elif calc_mode.lower()=="full":
         # Next line distributes calculation over individual point-sources:
-        #hc = c.hazard_matrix(quantity=quantity)
+        #hc = c.hazard_matrix_calculation(quantity=quantity)
 
         # Next line distributes calculation over hazard-matrix cells:
-        hc = c.hazard_matrix_parallel(quantity=quantity)
+        hc = c.hazard_matrix_calculation_parallel(quantity=quantity)
 
         # Save to HDF5 file:
         results_file = '{}_'.format(quantity) + \

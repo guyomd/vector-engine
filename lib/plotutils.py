@@ -3,7 +3,7 @@ import os
 from math import ceil
 from matplotlib import pyplot as plt
 import numpy as np
-from vengine.lib.parser import get_matrix_values_and_axes, read_hzd_matrix
+from vengine.lib.parser import load_dataset_from_hdf5
 from vengine.lib.marginals import build_marginals, poe2pdf
 from openquake.commonlib.readinput import get_oqparam
 
@@ -54,25 +54,28 @@ def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=
         cb.ax.set_title(cbar_title)
 
 
-def plot_marginals(hdf5file, job_ini, refcurves=None, savedir=None, **kwargs):
+def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
     """
     Build plot of unidimensional marginal PDF or POE for each period involved in the N-D calculation
 
-    :param hdf5file: str, path to the HDF5 containing the N-D hazard matrix results
-    :param job_ini: str, path to OQ configuration file (e.g. job.ini)
+    :param mat: N-D numpy.ndarray, N-D hazard matrix expressed in terms of POE
+    :param imtls: Dictionary of IM values. Each key stands for an IMT, and the
+                  corresponding value is a list of IM values.
     :param refcurves: dict, dictionary of reference hazard curves, used for visual comparison
                             with computed marginals. Dictionary keys should match periods read
-                            in the HDF5 file,  and dictionary values are sub-dict with keys ['hdf5', 'ini']:
+                            in the HDF5 file,  and dictionary values formatted using any of these
+                            two pairs of keys: ['hdf5', 'label'] or ['data', 'imtls']
                             e.g. refcurves = {
-                                     'SA(0.1)': {'hdf5': 'path/to/hdf5', 'ini': 'path/to/job.ini'}
-                                     'PGA': {'hdf5': 'path/to/hdf5', 'ini': 'path/to/job.ini'}
+                                     'SA(0.1)': {'hdf5': 'path/to/hdf5', 'label': 'hazard_curve_SA(0.1)'}
+                                     'PGA': {'hdf5': 'path/to/hdf5', 'label': 'hazard_curve_PGA'}
                                      }
     :param savedir: str, directory path for saved figures. If None, figures are not saved (default: ./).
     :param normalize: logical, specify whether N-D PDF should be normalized (default: False)
 
     """
-    mat, periods, logx, x = get_matrix_values_and_axes(hdf5file, job_ini)
-
+    logx = np.array([np.log(imtls[p]) for p in imtls.keys()])
+    # x = np.log(np.array([imtls[p] for p in imtls.keys()]))
+    periods = list(imtls.keys())
     nd = len(mat.shape)
     if nd == 2:
         # Add special plots for the 2-D case:
@@ -95,15 +98,23 @@ def plot_marginals(hdf5file, job_ini, refcurves=None, savedir=None, **kwargs):
         plt.show()
         """
 
-    marg_poe, marg_pdf = build_marginals(mat, logx, **kwargs)
+    marg_poe, marg_pdf = build_marginals(mat, imtls, **kwargs)
 
     for i in range(len(periods)):
         period = str(periods[i])
 
         if (refcurves is not None) and (period in list(refcurves.keys())):
-            ref = read_hzd_matrix(refcurves[period]['hdf5'])
-            oqtmp = get_oqparam(refcurves[period]['ini'])
-            ref_x = np.log(oqtmp.imtls[periods[i]])
+
+            if ('hdf5' in refcurves[period]) and ('label' in refcurves[period]):
+                ref, imtls_ref = load_dataset_from_hdf5(refcurves[period]['hdf5'],
+                                                        label=refcurves[period]['abel'])
+            elif ('data' in refcurves[period]) and ('imtls' in refcurves[period]):
+                ref = refcurves[period]['data']
+                imtls_ref = refcurves[period]['imtls']
+            else:
+                raise ValueError(f'Dictionary is not formatted correctly for IMT {period}')
+
+            ref_x = np.log(imtls_ref[period])
             fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True)
             # Reference 1-D hazard curve:
             ax[0].plot(ref_x, ref, label='1-D ref.')

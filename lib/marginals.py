@@ -75,18 +75,18 @@ def pdf2poe1D(pdf, x):
     return poe
 
 
-def build_marginals(mat, logx, normalize=False):
+def build_marginals(mat, imtls, normalize=False):
     """
     Builds the set of N unidimensional marginal PDF from a N-D hazard matrix
 
     :param mat: N-D numpy.ndarray, N-D hazard matrix expressed in terms of POE
-    :param logx: 2-D numpy.ndarray, Logarithm of acceleration values for all N periods
-                 For a proper integration, log of acceleration values should be used!
-                (to ensure coherency with the integration space used in poe_gm() method)
-
+    :param imtls: Dictionary of IM values. Each key stands for an IMT, and the
+                  corresponding value is a list of IM values.
     :param normalize: logical, specify whether N-D PDF should be normalized (default: False)
 
     """
+    logx = np.array([np.log(imtls[p]) for p in imtls.keys()])
+    # x = np.log(np.array([imtls[p] for p in imtls.keys()]))
     nd = len(mat.shape)
     print(f'Maximum value of the {nd}-D POE hazard matrix : {mat.max()}')
     pdf, xmid = poe2pdf(mat, logx, diff_option='gradient')

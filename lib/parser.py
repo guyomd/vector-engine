@@ -111,23 +111,24 @@ def parse_sites(oqparam):
     return sites_col
 
 
-def read_hzd_matrix(hdf5file):
+def load_dataset_from_hdf5(hdf5file, label='hazard_matrix', num_sites=1):
+    """
+       This function returns a N-D matrix, and a dictionary of IM values
+       from a HDF5 archive.
+    """
     with h5py.File(hdf5file, 'r') as f:
-        allsites_mat = f.get('hazard_matrix')[()]
-        # Matrix shape is [Nsites, Nper1, ..., Nperk):
-        assert allsites_mat.shape[0] == 1  # Only one site permitted
-        return np.squeeze(allsites_mat)
+        dset = f.get(label)
+        data = dset[()]
+        imtls = dict()
+        for k in dset.attrs.keys():
+            imtls.update({k: dset.attrs[p]})
+    assert data.shape[0] == num_sites  # Default:Only one site permitted
+    return np.squeeze(data), imtls
 
 
-def get_matrix_values_and_axes(hdf5file, job_ini):
-    mat = read_hzd_matrix(hdf5file)
-    oq = get_oqparam(job_ini)
-    imtls = oq.imtls
-    per = oq.imtls.keys()
-    periods = list(per)
-
-    # Warning: For a proper integration, log of acceleration values should be used!
-    #          (to be coherent with the integration space used in poe_gm() method)
+def get_matrix_values_and_axes(hdf5file, label='hazard_matrix'):
+    mat, imtls = load_dataset_from_hdf5(hdf5file)
+    per = imtls.keys()
     logx = np.array([np.log(imtls[p]) for p in per])
     x = np.log(np.array([imtls[p] for p in per]))
-    return mat, periods, logx, x
+    return mat, imtls, logx, x

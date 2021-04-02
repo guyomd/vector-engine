@@ -1,7 +1,7 @@
 
 import numpy as np
-
 from openquake.hazardlib import imt
+from vengine.lib.marginals import build_marginals
 
 
 class MultiDimensionalHazardCurve():
@@ -30,6 +30,7 @@ class MultiDimensionalHazardCurve():
         self.sites = sites
         self.maximum_distance = maximum_distance
         self.hazard_matrix = None
+        self.imtls = imtls
 
 
     def set_correlation_matrix(self):
@@ -58,3 +59,13 @@ class MultiDimensionalHazardCurve():
 
     def plot(self):
         pass
+
+
+    def compute_marginals(self):
+        """
+            Constructs 1-D marginal survival and pdf for the current hazard matrix
+        """
+        poe, pdf = build_marginals(self.hazard_matrix, self.imtls)
+        self.marginals_poe = poe
+        self.marginals_pdf = pdf
+        return poe, pdf
