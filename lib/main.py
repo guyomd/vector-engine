@@ -45,12 +45,24 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
     npts = c.count_pointsources()
     logging.info('\nNumber of point-sources: {}'.format(npts))
 
-    if calc_mode.lower() == "check-marginals":
+    if calc_mode.lower().endswith("-marginals"):
         # First, run computation on 1-D PSHA for each period, and then run a "full" mode
-        # N-D calculation and compute marginal 1-D hazard curves for comparison:
+        # N-D calculation and compute marginal 1-D hazard curves for comparison
+        # Two modes available:
+        # "plot-marginals" --> compute marginals, save to HDF5 and save plots
+        # "calc-marginals", "full-with-marginals" --> compute marginals, save to HDF5, no plot.
 
+        if calc_mode.lower().startswith("plot"):
+            nsteps = 4
+            build_plots = True
+        elif calc_mode.lower().startswith("calc") or calc_mode.lower().startswith('full'):
+            nsteps = 3
+            build_plots = False
+        else:
+            raise ValueError(f'Unknown calculcation mode: "{calc_mode}"')
+        
         # Suite of independent 1-D calculations:
-        print(f'\n# STEP 1/4: Compute unidimensional hazard curves for all periods')
+        print(f'\n# STEP 1/{nsteps}: Compute unidimensional hazard curves for all periods')
         nd = len(oqparam.imtls.keys())
         ref1D = dict()
         for key in list(oqparam.imtls.keys()):
@@ -65,14 +77,14 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
                           'data': deepcopy(hc1D.hazard_matrix)}
 
         # N-D hazard matrix computation:
-        print(f'\n# STEP 2/4 Compute N-dimensional hazard matrix')
+        print(f'\n# STEP 2/{nsteps} Compute N-dimensional hazard matrix')
         hc = c.hazard_matrix_calculation_parallel(quantity=quantity)
 
         # # Compute marginals:
         # marg_poe, marg_pdf = hc.hazard_matrix.compute_marginals()
 
         # Save all matrix/curves in HDF5:
-        print(f'\n# STEP 3/4 Save results in HDF5 archive')
+        print(f'\n# STEP 3/{nsteps} Save results in HDF5 archive')
         results_file = '{}_with_marginals_'.format(quantity) + \
                        '{}.hdf5'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':', '')
         with h5py.File(results_file, 'w') as h5f:
@@ -82,9 +94,10 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
                 dset1D = h5f.create_dataset(f'hazard_curve_{str(p)}', data=ref1D[key]['data'])
                 dset1D.attrs[p] = array(ref1D[p]['imtls'][p])
 
-        # Produce plots and save them:
-        print(f'\n# STEP 4/4 Make plots and save to current directory')
-        plotutils.plot_marginals(hc.hazard_matrix, oqparam.imtls, refcurves=ref1D, savedir='.')
+        if build_plots:
+            # Produce plots and save them:
+            print(f'\n# STEP 4/{nsteps} Make plots and save to current directory')
+            plotutils.plot_marginals(hc.hazard_matrix, oqparam.imtls, refcurves=ref1D, savedir='.')
 
     elif calc_mode.lower()=="full":
         # Next line distributes calculation over individual point-sources:
