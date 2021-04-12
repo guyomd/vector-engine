@@ -8,7 +8,7 @@ from vengine.lib.marginals import build_marginals, poe2pdf
 from openquake.commonlib.readinput import get_oqparam
 
 
-def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False):
+def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False, **kwargs):
     if isinstance(h, plt.Axes):
         h = h.get_figure()  # Eventually, retrieve parent Figure handle
     elif isinstance(h, plt.Figure):
@@ -18,12 +18,11 @@ def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False):
         h = plt.gcf()
     plt.figure(h.number)   # Set as current figure
     h.set_size_inches(size[0], size[1])  # size = (width, height)
-    kwargs = dict()
     if tight:
         kwargs.update({'bbox_inches': 'tight'})
     else:
         kwargs.update({'bbox_inches': None})
-    plt.savefig(filename, dpi=150, format='png', pad_inches=0.05, **kwargs)
+    plt.savefig(filename, dpi=150, pad_inches=0.05, **kwargs)
     print(f'Figure saved in {filename}')
     if not keep_opened:
         plt.close(h.number)
@@ -54,7 +53,7 @@ def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=
         cb.ax.set_title(cbar_title)
 
 
-def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
+def plot_marginals(mat, imtls, refcurves=None, savedir=None, plot_diff='relative', **kwargs):
     """
     Build plot of unidimensional marginal PDF or POE for each period involved in the N-D calculation
 
@@ -73,6 +72,7 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
     :param normalize: logical, specify whether N-D PDF should be normalized (default: False)
 
     """
+    mat = np.squeeze(mat)
     logx = np.array([np.log(imtls[p]) for p in imtls.keys()])
     # x = np.log(np.array([imtls[p] for p in imtls.keys()]))
     periods = list(imtls.keys())
@@ -97,8 +97,7 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
         plt.colorbar()
         plt.show()
         """
-
-    marg_poe, marg_pdf = build_marginals(mat, imtls, **kwargs)
+    marg_poe, marg_pdf, xupd = build_marginals(mat, imtls, **kwargs)
 
     for i in range(len(periods)):
         period = str(periods[i])
@@ -113,17 +112,24 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
                 imtls_ref = refcurves[period]['imtls']
             else:
                 raise ValueError(f'Dictionary is not formatted correctly for IMT {period}')
-
-            ref_x = np.log(imtls_ref[period])
+ 
+            # Remove dimensions of length 1 in hazard matrix:
+            ref = np.squeeze(ref)
+            ref_x = imtls_ref[period]
             fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True)
+
             # Reference 1-D hazard curve:
             ax[0].plot(ref_x, ref, label='1-D ref.')
 
             # Plot differences:
-            # ax[1].plot(ref_x, (marg_poe[i]-ref)/ref, 'k--',
-            #           marker=None, fillstyle='full', label='Rel. error')
-            ax[1].plot(ref_x, marg_poe[i] - ref, 'k-',
-                       marker=None, fillstyle='full', label='Abs. error')
+            if plot_diff.lower() == 'relative':
+                ax[1].semilogx(ref_x, (marg_poe[i]-ref)/ref, 'k--',
+                           marker=None, fillstyle='full', label='Rel. error')
+            elif plot_diff.lower() == 'absolute':
+                ax[1].semilogx(ref_x, marg_poe[i] - ref, 'k-',
+                           marker=None, fillstyle='full', label='Abs. error')
+            else:
+                raise ValueError(f'Unknown value "{plot_diff}":  input argument "plot_diff" must either be "relative" or "absolute"') 
             ax[1].set_xlabel('ln(PSA in g)')
             ax[1].grid(True)
             ax[1].legend()
@@ -131,14 +137,15 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
             fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
 
         # 1-D marginal PDF from the N-D calculation:
-        xmid = logx[i][:-1]+0.5*(logx[i][1:]-logx[i][:-1])
-        hc = ax[0].plot(xmid[i], marg_pdf[i], ls=':', lw=1, label='PDF')
+        #hc = ax[0].plot(logx[i], marg_pdf[i], ls=':', lw=1, label='PDF')
+        hc = ax[0].semilogx(xupd[i], marg_pdf[i], ls=':', lw=1, label='PDF')
         # 1-D marginal POE from the N-D calculation:
-        ax[0].plot(xmid[i], marg_poe[i], color=hc[-1].get_color(),
+        #ax[0].plot(logx[i], marg_poe[i], color=hc[-1].get_color(),
+        #           ls='-', marker=None, fillstyle='full', label='POE')
+        ax[0].semilogx(xupd[i], marg_poe[i], color=hc[-1].get_color(),
                    ls='-', marker=None, fillstyle='full', label='POE')
         ax[0].set_xlabel('ln(PSA in g)')
         ax[0].set_yscale('log')
-        ax[0].set_xscale('linear')
         ax[0].set_title(period)
         ax[0].legend()
         ax[0].grid(True)
@@ -146,8 +153,12 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, **kwargs):
         if savedir is None:
             plt.show()
         else:
-            filename = savedir+os.sep+f'marginal_{period}.tif'
-            save_plot(filename, h=None, size=(8, 6), keep_opened=False, tight=False)
+            # Remove trailing directory separator character, if any:
+            if savedir.endswith(os.sep):
+                savedir = savedir[:-1]
+
+            filename = savedir+os.sep+f'marginal_{period}.png'
+            save_plot(filename, h=fig, size=(8, 6), keep_opened=False, tight=False)
 
 
 class ProgressBar():

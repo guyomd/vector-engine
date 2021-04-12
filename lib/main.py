@@ -84,7 +84,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
 
         # Produce plots and save them:
         print(f'\n# STEP 4/4 Make plots and save to current directory')
-        plotutils.plot_marginals(hc.hazard_matrix, oqparam.imtls, refcurves=ref1D, savedir='./')
+        plotutils.plot_marginals(hc.hazard_matrix, oqparam.imtls, refcurves=ref1D, savedir='.')
 
     elif calc_mode.lower()=="full":
         # Next line distributes calculation over individual point-sources:

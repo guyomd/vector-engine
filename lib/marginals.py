@@ -23,7 +23,9 @@ def poe2pdf(m, x, diff_option='diff'):
     shape = np.array(m.shape)
     for k in range(ndim):
         if diff_option == 'gradient':
-            pdf = -np.gradient(pdf, x[k], axis=k)
+            pdf = -np.gradient(pdf, x[k], axis=k, edge_order=1)
+            #x[k][0] = x[k][0]+0.5*(x[k][1]-x[k][0])
+            #x[k][-1] = x[k][-2]+0.5*(x[k][-1]-x[k][-2])
         elif diff_option == 'diff':
             shape[k] -= 1
             xmat = np.meshgrid(*x, indexing='ij')[k]
@@ -85,19 +87,26 @@ def build_marginals(mat, imtls, normalize=False):
     :param normalize: logical, specify whether N-D PDF should be normalized (default: False)
 
     """
+    # Remove dimensions of length 1 from the hazard matrix:
+    mat = np.squeeze(mat) 
+
+    # Compute log of abscissa for each dimension:
     logx = np.array([np.log(imtls[p]) for p in imtls.keys()])
     # x = np.log(np.array([imtls[p] for p in imtls.keys()]))
+
     nd = len(mat.shape)
     print(f'Maximum value of the {nd}-D POE hazard matrix : {mat.max()}')
-    pdf, xmid = poe2pdf(mat, logx, diff_option='gradient')
-    sumpdf = integrationND(pdf, xmid)
+    pdf, xmod = poe2pdf(mat, logx, diff_option='gradient')
+    sumpdf = integrationND(pdf, xmod)
     print(f'Sum of {nd}-D PDF : {sumpdf}')
     if normalize:
         pdf = pdf / sumpdf
-        print(f'Sum after normalization : {integrationND(pdf, xmid)}')
+        print(f'Sum after normalization : {integrationND(pdf, xmod)}')
 
-    marginals_pdf = marginals1D(pdf, xmid)
+    marginals_pdf = marginals1D(pdf, xmod)
     marginals_poe = list()
     for k in range(len(marginals_pdf)):
-        marginals_poe.append(pdf2poe1D(marginals_pdf[k], xmid[k]))
-    return marginals_poe, marginals_pdf
+        marginals_poe.append(pdf2poe1D(marginals_pdf[k], xmod[k]))
+
+    xupd = np.array([np.exp(arr) for arr in xmod])
+    return marginals_poe, marginals_pdf, xupd
