@@ -121,13 +121,13 @@ def load_dataset_from_hdf5(hdf5file, label='hazard_matrix', num_sites=1):
         data = dset[()]
         imtls = dict()
         for k in dset.attrs.keys():
-            imtls.update({k: dset.attrs[p]})
+            imtls.update({k: dset.attrs[k]})
     assert data.shape[0] == num_sites  # Default:Only one site permitted
     return np.squeeze(data), imtls
 
 
 def get_matrix_values_and_axes(hdf5file, label='hazard_matrix'):
-    mat, imtls = load_dataset_from_hdf5(hdf5file)
+    mat, imtls = load_dataset_from_hdf5(hdf5file, label=label)
     per = imtls.keys()
     logx = np.array([np.log(imtls[p]) for p in per])
     x = np.log(np.array([imtls[p] for p in per]))
