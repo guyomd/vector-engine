@@ -91,7 +91,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
             dset = h5f.create_dataset('hazard_matrix', data=hc.hazard_matrix)
             for p in oqparam.imtls.keys():
                 dset.attrs[p] = oqparam.imtls[p]
-                dset1D = h5f.create_dataset(f'hazard_curve_{str(p)}', data=ref1D[key]['data'])
+                dset1D = h5f.create_dataset(f'hazard_curve_{str(p)}', data=ref1D[p]['data'])
                 dset1D.attrs[p] = array(ref1D[p]['imtls'][p])
 
         if build_plots:

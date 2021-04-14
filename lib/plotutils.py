@@ -123,14 +123,16 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, plot_diff='relative
 
             # Plot differences:
             if plot_diff.lower() == 'relative':
-                ax[1].semilogx(ref_x, (marg_poe[i]-ref)/ref, 'k--',
+                ax[1].semilogx(ref_x, 100*(marg_poe[i]-ref)/ref, 'k--',
                            marker=None, fillstyle='full', label='Rel. error')
+                ax[1].set_ylabel('%')
             elif plot_diff.lower() == 'absolute':
                 ax[1].semilogx(ref_x, marg_poe[i] - ref, 'k-',
                            marker=None, fillstyle='full', label='Abs. error')
+                ax[1].set_ylabel('marginal - reference')
             else:
                 raise ValueError(f'Unknown value "{plot_diff}":  input argument "plot_diff" must either be "relative" or "absolute"') 
-            ax[1].set_xlabel('ln(PSA in g)')
+            ax[1].set_xlabel(period+' [g]')
             ax[1].grid(True)
             ax[1].legend()
         else:
@@ -144,8 +146,8 @@ def plot_marginals(mat, imtls, refcurves=None, savedir=None, plot_diff='relative
         #           ls='-', marker=None, fillstyle='full', label='POE')
         ax[0].semilogx(xupd[i], marg_poe[i], color=hc[-1].get_color(),
                    ls='-', marker=None, fillstyle='full', label='POE')
-        ax[0].set_xlabel('ln(PSA in g)')
-        ax[0].set_yscale('log')
+        ax[0].set_xlabel(period+' [g]')
+        ax[0].set_yscale('linear')
         ax[0].set_title(period)
         ax[0].legend()
         ax[0].grid(True)
