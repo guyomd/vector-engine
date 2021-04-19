@@ -1,7 +1,7 @@
 import h5py
 import time
 import logging
-from numpy import savetxt, array
+from numpy import savetxt, array, squeeze
 from datetime import datetime
 from copy import deepcopy
 
@@ -127,7 +127,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
         for trg in targets:
             logging.warning('Searching for pseudo-acceleration vector matching POE={}:'.format(trg))
             optimization_method = c.find_matching_poe # c.find_matching_poe_parallel_runs
-            results_file = '{}_{}'.format(quantity,trg) + \
+            results_file = '{}_optim_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
             header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
             with open(results_file, 'w') as f:
@@ -135,9 +135,18 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
                 f.write(','.join(header_cols)+'\n')
             optimization_method(trg, quantity=quantity, nsol=nb_runs, outputfile=results_file)
 
+    elif calc_mode.lower()=='return-period':
+        ncells = c.hc.count_cells()
+        if ncells != 1:
+            raise ValueError('Hazard matrix cannot contain more than 1 cell in "return-period" mode')
+        hc = c.hazard_matrix_calculation(quantity='are') # source-wise parallelization
+        results_file = 'return_period_{}.txt'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
+        with open(results_file, 'w') as f:
+            f.write('Return period (in yrs): {}'.format(1/squeeze(hc.hazard_matrix)))
+
+
     else:
         raise ValueError('Unknown calculation mode "{}"'.format(calc_mode))
 
+
     logging.info('Results stored in file {}'.format(results_file))
-
-

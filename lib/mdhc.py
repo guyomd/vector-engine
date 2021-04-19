@@ -61,6 +61,18 @@ class MultiDimensionalHazardCurve():
         pass
 
 
+    def count_cells(self):
+        """
+            Returns the total number of cells in hazard matrix
+        """
+        if self.hazard_matrix is None:
+            shape = (len(self.sites),) + tuple(len(self.imtls[str(p)]) for p in self.periods)
+            nc = np.prod(shape)
+        else:
+            nc = np.prod(self.hazard_matrix.shape)
+        return nc
+
+
     def compute_marginals(self):
         """
             Constructs 1-D marginal survival and pdf for the current hazard matrix
