@@ -62,6 +62,7 @@ else:
 
 if __name__ == "__main__":
     # TODO: Add a proper parsing of input arguments, using e.g. argparse...
+    # TODO: Include verbosity level as option (affect directly "logging.basicConfig()" statement)
     parallel.Starmap.init()
 
     if len(sys.argv)>2:
