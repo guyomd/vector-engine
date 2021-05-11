@@ -126,7 +126,8 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
 
         for trg in targets:
             logging.warning('Searching for pseudo-acceleration vector matching POE={}:'.format(trg))
-            optimization_method = c.find_matching_poe # c.find_matching_poe_parallel_runs
+            optimization_method = c.find_matching_poe_parallel_runs
+            #optimization_method = c.find_matching_poe
             results_file = '{}_optim_{}'.format(quantity,trg) + \
                            '_{}.csv'.format(datetime.now().replace(microsecond=0).isoformat()).replace(':','')
             header_cols = [quantity.upper(), 'NITER', 'NFEV'] + [str(p) for p in c.periods]
