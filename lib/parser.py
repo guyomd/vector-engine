@@ -2,14 +2,14 @@ import os
 from openquake.hazardlib.sourceconverter import SourceConverter
 from openquake.commonlib.readinput import (get_oqparam,
                                            get_source_model_lt,
-                                           get_gsim_lt,
-                                           get_imts)
+                                           get_gsim_lt)
 from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.geo import Polygon, Point
 from openquake.hazardlib.calc.filters import SourceFilter
 import h5py
 import numpy as np
+from openquake.hazardlib.lt import apply_uncertainties
 
 
 def parse_openquake_ini(job_ini):
@@ -30,7 +30,6 @@ def parse_openquake_ini(job_ini):
     ssm_lt = get_source_model_lt(oqparam)
     # Reag the gsim logic tree
     gsim_lt = get_gsim_lt(oqparam)
-    # imts = get_imts(oqparam)
     return oqparam, ssm_lt, gsim_lt
 
 
@@ -60,29 +59,34 @@ def get_sources_from_rlz(rlz, oqparam, ssm_lt, sourcefilter=None):
     if sourcefilter is None:
         filter_func = lambda x: x # No filter
     elif isinstance(sourcefilter, SourceFilter):
-        filter_func = sourcefilter.filter # filtering based on maximum integration distance
+        # filtering based on maximum integration distance:
+        filter_func = sourcefilter.filter 
     # Loop over groups included in the source model
     sources = []
     for grp in ssm:
         # Update source group for the current realisation:
-        updated_group = ssm_lt.apply_uncertainties(rlz.lt_path, grp)
+        bset_values = ssm_lt.bset_values(rlz)
+        updated_group = apply_uncertainties(bset_values, grp)
         # Loop over sources:
         for src in filter_func(updated_group):
             sources.append(src)
     return sources
 
+
 def get_value_and_weight_from_rlz(rlz):
     return rlz.value, rlz.weight
+
 
 def get_value_and_weight_from_gsim_rlz(rlz):
     return rlz.value, rlz.weight['weight']
 
+
 def parse_sites(oqparam):
-    if (oqparam.region is not None):
+    if oqparam.region is not None:
         assert oqparam.region.startswith('POLYGON')
         """
         raise ValueError('More than one site is specified (N={len(site_ctx)}). Although '
-                     'technically faesible using OQ library, this is not reasonable '
+                     'technically feasible using OQ library, this is not reasonable '
                      'for VPSHA calculations')
         """
         # Convert region specifications to polygon:
