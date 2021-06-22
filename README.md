@@ -1,4 +1,4 @@
-# v-engine
+# vector-engine
 Vector-valued PSHA calculations, based on libraries from the Openquake Engine
 
 **Warning**: 
