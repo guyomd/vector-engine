@@ -8,7 +8,7 @@ from copy import deepcopy
 from openquake.baselib.general import DictArray
 from openquake.commonlib.readinput import get_oqparam, get_imts
 
-from vengine.lib import imcm, parser, calc, plotutils  # IMPORT VPSHA MODULES
+from vectorengine.lib import imcm, parser, calc, plotutils
 
 
 def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.BakerCornell2006()):

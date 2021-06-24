@@ -1,5 +1,5 @@
 import logging
-from vengine.lib import parser, mdhc
+from vectorengine.lib import parser, mdhc
 import numpy as np
 from scipy.stats import mvn
 from scipy.optimize import minimize, Bounds

@@ -1,7 +1,7 @@
 
 import numpy as np
 from openquake.hazardlib import imt
-from vengine.lib.marginals import build_marginals
+from vectorengine.lib.marginals import build_marginals
 
 
 class MultiDimensionalHazardCurve():

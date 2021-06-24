@@ -3,8 +3,8 @@ import os
 from math import ceil
 from matplotlib import pyplot as plt
 import numpy as np
-from vengine.lib.parser import load_dataset_from_hdf5
-from vengine.lib.marginals import build_marginals, poe2pdf
+from vectorengine.lib.parser import load_dataset_from_hdf5
+from vectorengine.lib.marginals import build_marginals, poe2pdf
 from openquake.commonlib.readinput import get_oqparam
 
 

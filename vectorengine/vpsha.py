@@ -6,7 +6,7 @@ from datetime import datetime
 from openquake.baselib import parallel, config 
 from openquake.commonlib.oqvalidation import OqParam
 
-from vengine.lib.main import run_job
+from vectorengine.lib.main import run_job
 
 # HELP:
 # To launch the script use the following command:
