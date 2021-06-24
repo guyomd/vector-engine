@@ -4,13 +4,15 @@ import numpy as np
 from scipy.stats import mvn
 from scipy.optimize import minimize, Bounds
 
+from openquake.baselib.parallel import Starmap
+
+from openquake.commonlib.readinput import get_gsim_lt, get_source_model_lt, get_imts
+from openquake.commonlib.datastore import hdf5new
+
 from openquake.hazardlib.contexts import ContextMaker, RuptureContext
 from openquake.hazardlib.calc.filters import SourceFilter
-from openquake.commonlib.readinput import get_gsim_lt, get_source_model_lt, get_imts
 from openquake.hazardlib import const
 
-from openquake.baselib.parallel import Starmap
-from openquake.baselib.datastore import hdf5new
 
 
 def are2poe(are: np.ndarray, investigation_time=1.0):

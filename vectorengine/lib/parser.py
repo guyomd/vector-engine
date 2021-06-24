@@ -1,15 +1,17 @@
 import os
-from openquake.hazardlib.sourceconverter import SourceConverter
+import h5py
+import numpy as np
+
 from openquake.commonlib.readinput import (get_oqparam,
                                            get_source_model_lt,
                                            get_gsim_lt,
                                            get_imts)
+
+from openquake.hazardlib.sourceconverter import SourceConverter
 from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.geo import Polygon, Point
 from openquake.hazardlib.calc.filters import SourceFilter
-import h5py
-import numpy as np
 
 
 def parse_openquake_ini(job_ini):
