@@ -15,7 +15,7 @@ from vectorengine.lib.main import run_job
 # Below the following parameters can be changed by the user:
 #  quantity = "poe" or "are"
 
-TERMINATE = config.distribution.terminate_workers_on_revoke
+#TERMINATE = config.distribution.terminate_workers_on_revoke
 OQ_DISTRIBUTE = parallel.oq_distribute()
 logging.basicConfig(level=logging.INFO,
                     format='[%(asctime)s] %(message)s') # In command-line "--log=INFO", other levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -85,6 +85,7 @@ if __name__ == "__main__":
         logging.warning('Calculation finished correctly in {:.1f} seconds'.format(time.time()-t0))
     finally:
         parallel.Starmap.shutdown()
-        if OQ_DISTRIBUTE.startswith('celery'):
-            celery_cleanup(TERMINATE)
+        # Deactivate the following two lines due to incompatibility version 3.11 : 
+        #if OQ_DISTRIBUTE.startswith('celery'):
+        #    celery_cleanup(TERMINATE)
 
