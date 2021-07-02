@@ -6,7 +6,7 @@ from scipy.optimize import minimize, Bounds
 
 from openquake.baselib.parallel import Starmap
 
-from openquake.commonlib.readinput import get_gsim_lt, get_source_model_lt, get_imts
+from openquake.commonlib import readinput 
 from openquake.commonlib.datastore import hdf5new
 
 from openquake.hazardlib.contexts import ContextMaker, RuptureContext
@@ -33,17 +33,18 @@ def poe2are(poe: np.ndarray, investigation_time=1.0):
 
 class VectorValuedCalculator():
 
-    def __init__(self, oqparam, sites_col, correlation_model):
+    def __init__(self, oqparam, csm, sitecol, correlation_model):
         self.oqparam = oqparam
-        self.ssm_lt = get_source_model_lt(oqparam) # Read the SSC logic tree
+        self.csm = csm  # Composite source model
+        self.ssm_lt = csm.full_lt.source_model_lt  # SSM logic tree
         self.hc = mdhc.MultiDimensionalHazardCurve(oqparam.imtls,
-                                                   sites_col, correlation_model,
+                                                   sitecol, correlation_model,
                                                    oqparam.maximum_distance)
         self.ndims = len(oqparam.imtls.keys())
-        self.periods = get_imts(oqparam)
-        self.sites = sites_col
+        self.periods = readinput.get_imts(oqparam)
+        self.sites = sitecol
         self.cm = correlation_model
-        self.srcfilter = SourceFilter(sites_col, oqparam.maximum_distance)
+        self.srcfilter = SourceFilter(sitecol, oqparam.maximum_distance)
         self.integration_prms = {'truncation_level': oqparam.truncation_level,
                                  'abseps': 0.0001,  # Documentation: Optimal value is 1E-6
                                  'maxpts': self.ndims*10  # Documentation: Optimal value is len(lnSA)*1000
@@ -68,16 +69,30 @@ class VectorValuedCalculator():
         return trunc_norm
 
 
+    def _get_sources_from_smr(self, smr):
+        sources = []
+        groups = self.csm.get_groups(smr)
+        for grp in groups:
+            for srcs in self.srcfilter.filter(grp):
+                for src in srcs:
+                    sources.append(src)
+        return sources
+
+
+    def count_sources(self):
+        return len(self.csm.get_sources())
+
+
     def count_pointsources(self):
         """
         Returns the total number of point-sources involved in the current calculation
         """
         n = 0
-        for rlz in self.ssm_lt:
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
-            for src in srcs:
-                for _ in self.srcfilter.filter(src):
-                    n += 1
+        for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
+            srcs = self._get_sources_from_smr(smr)
+                for src in srcs:
+                    for _ in self.srcfilter.filter(src):
+                        n += 1
         return n
 
 
@@ -180,20 +195,21 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         are = 0
-        for rlz in self.ssm_lt:  # Loop over realizations
-            _, weight = parser.get_value_and_weight_from_rlz(rlz)
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
+        for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
+            for rlz in rlzs:
+                _, weight = parser.get_value_and_weight_from_rlz(rlz)
+                srcs = self._get_sources_from_smr(smr)
 
-            for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
+                for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
 
-                for pt in self.srcfilter.filter(src):  # Loop over point-sources
+                    for pt in self.srcfilter.filter(src):  # Loop over point-sources
 
-                    gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
-                    for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
-                        gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(
-                            gsim_rlz)
-                        pt_weight = weight * gsim_weight
-                        are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
+                        gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
+                        for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
+                            gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(
+                                gsim_rlz)
+                            pt_weight = weight * gsim_weight
+                            are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
         return are
 
     def are_parallel(self, lnSA):
@@ -203,26 +219,27 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         args_list = list()
-        for rlz in self.ssm_lt:  # Loop over realizations
-            _, weight = parser.get_value_and_weight_from_rlz(rlz)   
-            srcs = parser.get_sources_from_rlz(rlz, self.oqparam, self.ssm_lt, sourcefilter=self.srcfilter)
+        for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
+            for rlz in rlzs:  # Loop over realizations
+                _, weight = parser.get_value_and_weight_from_rlz(rlz)  # TODO:  
+                srcs = self._get_sources_from_smr(smr)
+    
+                for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
+ 
+                    for pt in self.srcfilter.filter(src):  # Loop over point-sources
 
-            for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
+                        gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
+                        for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
+                            gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(gsim_rlz)
 
-                for pt in self.srcfilter.filter(src):  # Loop over point-sources
+                            # Distribute ARE:
+                            pt_weight = weight*gsim_weight
+                            args = (self, pt, gsim_model, pt_weight, lnSA)
+                            args_list.append(args)
 
-                    gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
-                    for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
-                        gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(gsim_rlz)
-
-                        # Distribute ARE:
-                        pt_weight = weight*gsim_weight
-                        args = (self, pt, gsim_model, pt_weight, lnSA)
-                        args_list.append(args)
-
-            are = 0
-            for value in Starmap(self.pt_src_are.__func__, args_list):
-                are += value
+                are = 0
+        for value in Starmap(self.pt_src_are.__func__, args_list):
+            are += value
         return are
 
 
@@ -309,15 +326,6 @@ class VectorValuedCalculator():
             # Call hazard curve computation method:
             #hazard_output = hc_calc_method(accels)
             args.append((indices, hc_calc_method, accels))
-
-            """
-            # Sort results for each site:
-            for k in range(len(hazard_output)):  
-                # Loop on sites, i.e. 1st dimension of  "hazard_output"
-                # indx = np.ravel_multi_index((k,)+indices, shape)
-                # indices = np.unravel_index(indx, shape)
-                output[(k,) + indices] = hazard_output[k]
-            """
 
         output = np.empty(shape)
         for result in Starmap(_matrix_cell_worker, args):

@@ -2,8 +2,10 @@ import os
 import h5py
 import numpy as np
 
-from openquake.commonlib.readinput import (get_oqparam,
-                                           get_source_model_lt,
+from openquake.commonlib.readinput 
+import (get_oqparam,
+                                  
+                                   get_source_model_lt,
                                            get_gsim_lt,
                                            get_imts)
 
@@ -27,51 +29,14 @@ def parse_openquake_ini(job_ini):
     "openquake.commonlib.logictree.SourceModelLogicTreeCollection"
     """
     # Read the .ini file
-    oqparam = get_oqparam(job_ini)
-    # Read the ssc logic tree
-    ssm_lt = get_source_model_lt(oqparam)
-    # Reag the gsim logic tree
-    gsim_lt = get_gsim_lt(oqparam)
-    # imts = get_imts(oqparam)
+    oqparam = readinput.get_oqparam(job_ini)
+    # Read model:
+    csm = readinput.get_composite_source_model(oqparam)
+    # Logic tree for the seismic source model:
+    ssm_lt = csm.full_lt.source_model_lt
+    # Logic tree for the ground shaking intensity model:
+    gsim_lt = csm.full_lt.gsim_lt
     return oqparam, ssm_lt, gsim_lt
-
-
-def get_sources_from_rlz(rlz, oqparam, ssm_lt, sourcefilter=None):
-    """
-    :param rlz: "openquake.commonlib.logictree.Realization" instance
-    :param oqparam: "openquake.commonlib.oqvalidation.OqParam" instance
-    :param ssm_lt: instance of class
-                  "openquake.commonlib.logictree.SourceModelLogicTreeCollection"
-    :param sourcefilter: instance of class "openquake.hazardlib.calc.filters.SourceFilter", apply a filtering of seismic
-                         sources based a maximum integration distance. Default: None
-    :return : a list of seismic sources instances, e.g.
-                  "openquake.hazardlib.source.area.AreaSource"
-    NOTE/ Incompatibility: method ssm_lt.apply_incertainties() has been removed in openquake.engine versions >= 3.9
-    """
-    # Creating a source converter
-    conv = SourceConverter(oqparam.investigation_time,
-                           oqparam.rupture_mesh_spacing,
-                           oqparam.complex_fault_mesh_spacing,
-                           oqparam.width_of_mfd_bin,
-                           oqparam.area_source_discretization)
-    # Set the name of the model
-    ssm_fname = os.path.join(oqparam.base_path, rlz.value)
-    # Read the source model
-    ssm = to_python(ssm_fname, conv)
-    # Set-up filter if required:
-    if sourcefilter is None:
-        filter_func = lambda x: x # No filter
-    elif isinstance(sourcefilter, SourceFilter):
-        filter_func = sourcefilter.filter # filtering based on maximum integration distance
-    # Loop over groups included in the source model
-    sources = []
-    for grp in ssm:
-        # Update source group for the current realisation:
-        updated_group = ssm_lt.apply_uncertainties(rlz.lt_path, grp)
-        # Loop over sources:
-        for src in filter_func(updated_group):
-            sources.append(src)
-    return sources
 
 def get_value_and_weight_from_rlz(rlz):
     return rlz.value, rlz.weight
@@ -80,13 +45,10 @@ def get_value_and_weight_from_gsim_rlz(rlz):
     return rlz.value, rlz.weight['weight']
 
 def parse_sites(oqparam):
+    
+    """
     if (oqparam.region is not None):
         assert oqparam.region.startswith('POLYGON')
-        """
-        raise ValueError('More than one site is specified (N={len(site_ctx)}). Although '
-                     'technically faesible using OQ library, this is not reasonable '
-                     'for VPSHA calculations')
-        """
         # Convert region specifications to polygon:
         reg_lons = [float(x.split(' ')[0]) for x in oqparam.region[9:-2].split(', ')]
         reg_lats = [float(x.split(' ')[1]) for x in oqparam.region[9:-2].split(', ')]
@@ -99,18 +61,20 @@ def parse_sites(oqparam):
                       z1pt0=oqparam.reference_depth_to_1pt0km_per_sec,
                       z2pt5=oqparam.reference_depth_to_2pt5km_per_sec)
                  for lon, lat, depth in zip(mesh.lons, mesh.lats, mesh.depths)]
-        sites_col = SiteCollection(sites)
+        sitecol = SiteCollection(sites)
     elif isinstance(oqparam.sites, list):
         sites = [Site(Point(s[0], s[1], s[2]),
                       vs30=oqparam.reference_vs30_value,
                       z1pt0=oqparam.reference_depth_to_1pt0km_per_sec,
                       z2pt5=oqparam.reference_depth_to_2pt5km_per_sec)
                  for s in oqparam.sites]
-        sites_col = SiteCollection(sites)
+        sitecol = SiteCollection(sites)
     else:
         assert isinstance(oqparam.sites, SiteCollection)
-        sites_col = oqparam.sites
-    return sites_col
+        sitecol = oqparam.sites
+    return sitecol
+    """
+    return readinput.get_site_collection(oqparam)
 
 
 def load_dataset_from_hdf5(hdf5file, label='hazard_matrix', num_sites=1):

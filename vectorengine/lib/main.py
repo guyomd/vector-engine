@@ -6,7 +6,10 @@ from datetime import datetime
 from copy import deepcopy
 
 from openquake.baselib.general import DictArray
-from openquake.commonlib.readinput import get_oqparam, get_imts
+from openquake.commonlib.readinput import (get_oqparam, 
+                                           get_imts, 
+                                           get_full_lt)
+from openquake.commonlib.logictree import FullLogicTree
 
 from vectorengine.lib import imcm, parser, calc, plotutils
 
@@ -28,8 +31,11 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
     # Parse the seismic source model:
     oqparam = get_oqparam(job_ini)
 
+    # Get the full logic-tree:
+    full_lt = get_full_lt(oqparam)
+
     # Get the list of Tectonic Region Types :
-    trt = oqparam._gsims_by_trt.keys()
+    trt = full_lt.get_gsims_by_trt().keys()
 
     # Manage the target sites specification, as site, site-collection or as a region:
     sites_col = parser.parse_sites(oqparam)

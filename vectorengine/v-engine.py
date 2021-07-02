@@ -3,7 +3,7 @@ import sys
 import logging
 from datetime import datetime
 
-from openquake.baselib import parallel, config 
+from openquake.baselib import parallel, config, sap
 from openquake.commonlib.oqvalidation import OqParam
 
 from vectorengine.lib.main import run_job
@@ -17,8 +17,6 @@ from vectorengine.lib.main import run_job
 
 #TERMINATE = config.distribution.terminate_workers_on_revoke
 OQ_DISTRIBUTE = parallel.oq_distribute()
-logging.basicConfig(level=logging.INFO,
-                    format='[%(asctime)s] %(message)s') # In command-line "--log=INFO", other levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 logging.info('OQ_DISTRIBUTE set to "{}"'.format(OQ_DISTRIBUTE))
 if OQ_DISTRIBUTE.startswith('celery'):
@@ -59,22 +57,25 @@ else:
         pass
 
 
-
 if __name__ == "__main__":
-    # TODO: Add a proper parsing of input arguments, using e.g. argparse...
-    #       Solution: use openquake.baselib.sap (sap=Simple Argument Parser based on argparse
-    # TODO: Include verbosity level as option (affect directly "logging.basicConfig()" statement)
+
+    def _parse_inputs(ini_file,  mode, *, nb_runs=1, quantity='POE', log='INFO'):
+        return ini_file, mode, nb_runs, quantity.lower(), log
+    
+    # Set-up argument parser:
+    _parse_inputs.ini_file = 'Openquake configuration file, e.g. job.ini'
+    _parse_inputs.mode = 'Calculation mode: "full", "optim", "return-period", "calc-marginals", "plot-marginals"'
+    _parse_inputs.nb_runs = 'Number of N-D hazard samples matching target POE in "optim" mode'
+    _parse_inputs.quantity = 'Hazard curve unit: POE or ARE'
+    _parse_inputs.log = 'Verbosity level: DEBUG, INFO, WARNING, ERROR, CRITICAL'
+    job_ini, calc_mode, n_runs, hc_unit, loglevel = sap.run(_parse_inputs, prog="vpsha")
+
+    # Set logging level:
+    logging.basicConfig(level=getattr(logging,loglevel),
+            format='[%(asctime)s] %(message)s') 
+
+    # Initialize parallelization:
     parallel.Starmap.init()
-
-    if len(sys.argv)>2:
-        calc_mode = sys.argv[2]
-    else:
-        calc_mode = "full"
-
-    if len(sys.argv)>3 and calc_mode=='optim':
-        n_runs = int(sys.argv[3])
-    else:
-        n_runs = 1
 
     try:
         logging.info('Setting up default settings for concurrent tasks')
@@ -82,7 +83,7 @@ if __name__ == "__main__":
         t0 = time.time()
         logging.info('Starting VPSHA computation run on {}'.format(datetime.now()))
         job_ini = sys.argv[1]
-        run_job(job_ini, quantity='poe', calc_mode=calc_mode, nb_runs=n_runs)
+        run_job(job_ini, quantity=hc_unit, calc_mode=calc_mode, nb_runs=n_runs)
         logging.warning('Calculation finished correctly in {:.1f} seconds'.format(time.time()-t0))
     finally:
         parallel.Starmap.shutdown()
