@@ -62,6 +62,7 @@ else:
 
 if __name__ == "__main__":
     # TODO: Add a proper parsing of input arguments, using e.g. argparse...
+    #       Solution: use openquake.baselib.sap (sap=Simple Argument Parser based on argparse
     # TODO: Include verbosity level as option (affect directly "logging.basicConfig()" statement)
     parallel.Starmap.init()
 
