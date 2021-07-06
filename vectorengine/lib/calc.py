@@ -176,10 +176,7 @@ class VectorValuedCalculator():
 
             # Filter the site collection with respect to the rupture and prepare context objects:
             context_maker = ContextMaker(r.tectonic_region_type, gsim)
-            site_ctx, dist_ctx = context_maker.make_contexts(self.sites, r)
-            rup_ctx = RuptureContext()
-            rup_ctx.mag = r.mag
-            rup_ctx.rake = r.rake
+            rup_ctx, site_ctx, dist_ctx = context_maker.make_contexts(self.sites, r)
             assert len(gsim)==1
 
             annual_rate += r.occurrence_rate * weight * self.gm_poe(gsim[0],
@@ -197,7 +194,6 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         are = 0
-
         # Loop on source model logic-tree realizations:
         for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
             srcs = self._get_sources_from_smr(smr)
@@ -205,16 +201,15 @@ class VectorValuedCalculator():
             # Loop on ground-motion model logic-tree realizations:
             for r in rlzs:
                 weight = r.weight
-                gsim_model, gsim_weight = \
+                gsim_model, _ = \
                         parser.get_value_and_weight_from_gsim_rlz(r.gsim_rlz)
-
+        
                 # Loop over (filtered) seismic sources (area, fault, etc...)
                 for src in srcs: 
 
                     # Loop over point-sources:
-                    for pt in self.srcfilter.filter(src):  
-                        pt_weight = weight * gsim_weight
-                        are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
+                    for pt, _ in self.srcfilter.filter(src):  
+                        are += self.pt_src_are(pt, gsim_model, weight['weight'], lnSA, None)
         return are
 
 
@@ -233,18 +228,16 @@ class VectorValuedCalculator():
             # Loop on ground-motion model logic-tree realizations:
             for r in rlzs:  # Loop over realizations
                 weight = r.weight 
-                gsim_model, gsim_weight = \
+                gsim_model, _ = \
                         parser.get_value_and_weight_from_gsim_rlz(r.gsim_rlz)
     
-                
                 # Loop over (filtered) seismic sources (area, fault, etc...)
                 for src in srcs:  
  
                     # Loop over point-sources:
-                    for pt in self.srcfilter.filter(src):  
+                    for pt, _ in self.srcfilter.filter(src):  
                             # Distribute ARE:
-                            pt_weight = weight*gsim_weight
-                            args = (self, pt, gsim_model, pt_weight, lnSA)
+                            args = (self, pt, gsim_model, weight['weight'], lnSA)
                             args_list.append(args)
                 are = 0
 

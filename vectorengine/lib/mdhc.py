@@ -1,4 +1,4 @@
-
+import logging
 import numpy as np
 from openquake.hazardlib import imt
 from vectorengine.lib.marginals import build_marginals
@@ -8,7 +8,7 @@ class MultiDimensionalHazardCurve():
     """
     Multi-dimensional Hazard Curve container
     """
-    def __init__(self, imtls, sites, gmcm, maximum_distance):
+    def __init__(self, imtls, sites, cm, maximum_distance):
         """
         MultiDimensionalHazardCurve initialization.
 
@@ -17,7 +17,7 @@ class MultiDimensionalHazardCurve():
         "openquake.commonlib.oqvalidation.OqParam"
         :param sites: instance of  class "openquake.hazardlib.site.SiteCollection"
         :param gsim: instance of Openquake GSIM class
-        :param gmcm: instance of "imcm.IntensityMeasureCorrelationModel" class
+        :param imcm: instance of "imcm.IntensityMeasureCorrelationModel" class
         :param maximum_distance: maximum  point-source to site distance for ARE calculations
         :param truncation_level: float, truncation level of the GMPE in std. dev.
         """
@@ -25,7 +25,7 @@ class MultiDimensionalHazardCurve():
         self.periods = list()
         for per in list(imtls.keys()):
             self.periods.append(imt.from_string(per))
-        self.gmcm = gmcm
+        self.imcm = cm
         self.set_correlation_matrix()
         self.sites = sites
         self.maximum_distance = maximum_distance
@@ -44,15 +44,16 @@ class MultiDimensionalHazardCurve():
         per = [ p.period for p in self.periods ]
         for i in range(self.ndims):
             for j in range(i, self.ndims):
-                corr[i, j] = self.gmcm.rho(per[i], per[j])
+                corr[i, j] = self.imcm.rho(per[i], per[j])
                 if i != j:
                     corr[j, i] = corr[i, j]
         if not is_pos_semidef(corr):
-            print('ERROR: Correlation matrix is not positive, semi-definite')
             val = np.linalg.eigvals(corr)
-            print('EIGENVALUES: {}'.format(val))
-            print('ADVICE: REPLACE negative eigenvalues with 0')
-            raise ValueError('Inappropriate Ground-motion Correlation matrix')
+            logging.warning('Correlation matrix is not positive, semi-definite')
+            logging.warning('eigenvalues: {}'.format(val))
+            logging.warning('--> replace negative eigenvalues with 0')
+            logging.error('Incorrect inter-IM correlation matrix')
+            #raise ValueError('Inappropriate Ground-motion Correlation matrix')
         else:
             self.corr = corr
 
