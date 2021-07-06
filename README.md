@@ -2,8 +2,8 @@
 Vector-valued PSHA calculations, based on the Openquake Engine Python library (https://github.com/gem/oq-engine)
 
 ## Installation instructions ##
-(For instructions on the EDF-specific Scibian environment, see [link](./INSTALL_EDF.md))
-&nbsp;
+(For instructions on the EDF-specific Scibian environment, see [link](./INSTALL_EDF.md))  
+  
 Set-up a dedicated __vpsha__ virtual environment:
 `$ python3 -m venv /path/to/virtual/env/vpsha`
 
