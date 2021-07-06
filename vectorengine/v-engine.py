@@ -7,13 +7,8 @@ from openquake.baselib import parallel, config, sap
 from openquake.commonlib.oqvalidation import OqParam
 
 from vectorengine.lib.main import run_job
+from vectorengine.lib import imcm
 
-# HELP:
-# To launch the script use the following command:
-#   python3 vpsha.py "AreaSourceClassicalPSHA/job.ini"
-#
-# Below the following parameters can be changed by the user:
-#  quantity = "poe" or "are"
 
 #TERMINATE = config.distribution.terminate_workers_on_revoke
 OQ_DISTRIBUTE = parallel.oq_distribute()
@@ -59,16 +54,19 @@ else:
 
 if __name__ == "__main__":
 
-    def _parse_inputs(ini_file,  mode, *, nb_runs=1, quantity='POE', log='INFO'):
-        return ini_file, mode, nb_runs, quantity.lower(), log
+    def _parse_inputs(ini_file,  mode, *, nb_runs=1, quantity='POE', 
+                      imcm='BakerJayaram2008', log='INFO'):
+        return ini_file, mode, nb_runs, quantity.lower(), imcm, log
     
     # Set-up argument parser:
-    _parse_inputs.ini_file = 'Openquake configuration file, e.g. job.ini'
-    _parse_inputs.mode = 'Calculation mode: "full", "optim", "return-period", "calc-marginals", "plot-marginals"'
-    _parse_inputs.nb_runs = 'Number of N-D hazard samples matching target POE in "optim" mode'
-    _parse_inputs.quantity = 'Hazard curve unit: POE or ARE'
-    _parse_inputs.log = 'Verbosity level: DEBUG, INFO, WARNING, ERROR, CRITICAL'
-    job_ini, calc_mode, n_runs, hc_unit, loglevel = sap.run(_parse_inputs, prog="vpsha")
+    _parse_inputs.ini_file = 'configuration file, e.g. job.ini'
+    _parse_inputs.mode = 'calculation mode: "full", "optim", "return-period", "calc-marginals", "plot-marginals"'
+    _parse_inputs.nb_runs = 'number of N-D hazard samples matching target POE in "optim" mode'
+    _parse_inputs.quantity = 'hazard curve unit: POE or ARE'
+    _parse_inputs.imcm = 'inter-IM correlation model, e.g. "BakerJayaram2008"'
+    _parse_inputs.log = 'verbosity level: DEBUG, INFO, WARNING, ERROR, CRITICAL'
+    job_ini, calc_mode, n_runs, hc_unit, imcm_class, loglevel = \
+            sap.run(_parse_inputs, prog="v-engine.py")
 
     # Set logging level:
     logging.basicConfig(level=getattr(logging,loglevel),
@@ -83,7 +81,8 @@ if __name__ == "__main__":
         t0 = time.time()
         logging.info('Starting VPSHA computation run on {}'.format(datetime.now()))
         job_ini = sys.argv[1]
-        run_job(job_ini, quantity=hc_unit, calc_mode=calc_mode, nb_runs=n_runs)
+        run_job(job_ini, quantity=hc_unit, calc_mode=calc_mode, nb_runs=n_runs, 
+                cm=getattr(imcm,imcm_class)())
         logging.warning('Calculation finished correctly in {:.1f} seconds'.format(time.time()-t0))
     finally:
         parallel.Starmap.shutdown()

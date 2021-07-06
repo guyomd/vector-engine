@@ -5,11 +5,7 @@ from numpy import savetxt, array, squeeze
 from datetime import datetime
 from copy import deepcopy
 
-from openquake.baselib.general import DictArray
-from openquake.commonlib.readinput import (get_oqparam, 
-                                           get_imts, 
-                                           get_full_lt)
-from openquake.commonlib.logictree import FullLogicTree
+from openquake.commonlib import readinput 
 
 from vectorengine.lib import imcm, parser, calc, plotutils
 
@@ -29,23 +25,20 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
     start_time = time.time()
 
     # Parse the seismic source model:
-    oqparam = get_oqparam(job_ini)
-
-    # Get the full logic-tree:
-    full_lt = get_full_lt(oqparam)
-
+    oqparam = readinput.get_oqparam(job_ini)
+    csm = readinput.get_composite_source_model(oqparam)
+    
     # Get the list of Tectonic Region Types :
-    trt = full_lt.get_gsims_by_trt().keys()
+    trt = csm.full_lt.get_gsims_by_trt().keys()
 
     # Manage the target sites specification, as site, site-collection or as a region:
-    sites_col = parser.parse_sites(oqparam)
+    sitecol = readinput.get_site_collection(oqparam)
 
     # Initialize multi-dimensional hazard curve:
-    logging.info(get_imts(oqparam))
-    #    periods = oqparam.imtls.keys()
+    logging.info(readinput.get_imts(oqparam))
 
     # Initialize VPS§HA calculator:
-    c = calc.VectorValuedCalculator(oqparam, sites_col, cm)
+    c = calc.VectorValuedCalculator(oqparam, csm, sitecol, cm)
 
     # Count total number of point-sources:
     npts = c.count_pointsources()
@@ -77,7 +70,7 @@ def run_job(job_ini, quantity = 'poe', calc_mode = 'full', nb_runs = 1, cm=imcm.
             oqprm1D = deepcopy(oqparam)
             # Then, select only one IMT:
             oqprm1D.hazard_imtls = {str(key): oqparam.imtls[key].tolist()}
-            c1D = calc.VectorValuedCalculator(oqprm1D, sites_col, cm)
+            c1D = calc.VectorValuedCalculator(oqprm1D, csm, sitecol, cm)
             hc1D = c1D.hazard_matrix_calculation_parallel(quantity=quantity)
             ref1D[key] = {'imtls': deepcopy(oqprm1D.hazard_imtls),
                           'data': deepcopy(hc1D.hazard_matrix)}

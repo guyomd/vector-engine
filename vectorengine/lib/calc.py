@@ -33,17 +33,18 @@ def poe2are(poe: np.ndarray, investigation_time=1.0):
 
 class VectorValuedCalculator():
 
-    def __init__(self, oqparam, csm, sitecol, correlation_model):
+    def __init__(self, oqparam, csm, sitecol, cm):
         self.oqparam = oqparam
         self.csm = csm  # Composite source model
         self.ssm_lt = csm.full_lt.source_model_lt  # SSM logic tree
         self.hc = mdhc.MultiDimensionalHazardCurve(oqparam.imtls,
-                                                   sitecol, correlation_model,
+                                                   sitecol,
+                                                   cm,
                                                    oqparam.maximum_distance)
         self.ndims = len(oqparam.imtls.keys())
         self.periods = readinput.get_imts(oqparam)
         self.sites = sitecol
-        self.cm = correlation_model
+        self.cm = cm
         self.srcfilter = SourceFilter(sitecol, oqparam.maximum_distance)
         self.integration_prms = {'truncation_level': oqparam.truncation_level,
                                  'abseps': 0.0001,  # Documentation: Optimal value is 1E-6
@@ -73,7 +74,7 @@ class VectorValuedCalculator():
         sources = []
         groups = self.csm.get_groups(smr)
         for grp in groups:
-            for srcs in self.srcfilter.filter(grp):
+            for srcs, sitecol in self.srcfilter.filter(grp):
                 for src in srcs:
                     sources.append(src)
         return sources
@@ -88,11 +89,12 @@ class VectorValuedCalculator():
         Returns the total number of point-sources involved in the current calculation
         """
         n = 0
+        # Loop on source model logic-tree realizations:
         for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
             srcs = self._get_sources_from_smr(smr)
-                for src in srcs:
-                    for _ in self.srcfilter.filter(src):
-                        n += 1
+            for src in srcs:
+                for _ in self.srcfilter.filter(src):
+                    n += 1
         return n
 
 
@@ -195,22 +197,26 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         are = 0
+
+        # Loop on source model logic-tree realizations:
         for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
-            for rlz in rlzs:
-                _, weight = parser.get_value_and_weight_from_rlz(rlz)
-                srcs = self._get_sources_from_smr(smr)
+            srcs = self._get_sources_from_smr(smr)
+            
+            # Loop on ground-motion model logic-tree realizations:
+            for r in rlzs:
+                weight = r.weight
+                gsim_model, gsim_weight = \
+                        parser.get_value_and_weight_from_gsim_rlz(r.gsim_rlz)
 
-                for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
+                # Loop over (filtered) seismic sources (area, fault, etc...)
+                for src in srcs: 
 
-                    for pt in self.srcfilter.filter(src):  # Loop over point-sources
-
-                        gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
-                        for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
-                            gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(
-                                gsim_rlz)
-                            pt_weight = weight * gsim_weight
-                            are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
+                    # Loop over point-sources:
+                    for pt in self.srcfilter.filter(src):  
+                        pt_weight = weight * gsim_weight
+                        are += self.pt_src_are(pt, gsim_model, pt_weight, lnSA, None)
         return are
+
 
     def are_parallel(self, lnSA):
         """
@@ -219,25 +225,29 @@ class VectorValuedCalculator():
         param *lnSA: tuple, natural logarithm of acceleration values, in unit of g.
         """
         args_list = list()
+
+        # Loop on source model logic-tree realizations:
         for smr, rlzs in self.csm.full_lt.get_rlzs_by_smr().items():
-            for rlz in rlzs:  # Loop over realizations
-                _, weight = parser.get_value_and_weight_from_rlz(rlz)  # TODO:  
-                srcs = self._get_sources_from_smr(smr)
+            srcs = self._get_sources_from_smr(smr)
+            
+            # Loop on ground-motion model logic-tree realizations:
+            for r in rlzs:  # Loop over realizations
+                weight = r.weight 
+                gsim_model, gsim_weight = \
+                        parser.get_value_and_weight_from_gsim_rlz(r.gsim_rlz)
     
-                for src in srcs:  # Loop over (filtered) seismic sources (area, fault, etc...)
+                
+                # Loop over (filtered) seismic sources (area, fault, etc...)
+                for src in srcs:  
  
-                    for pt in self.srcfilter.filter(src):  # Loop over point-sources
-
-                        gsim_lt = get_gsim_lt(self.oqparam, trts=[src.tectonic_region_type])
-                        for gsim_rlz in gsim_lt:  # Loop over GSIM Logic_tree
-                            gsim_model, gsim_weight = parser.get_value_and_weight_from_gsim_rlz(gsim_rlz)
-
+                    # Loop over point-sources:
+                    for pt in self.srcfilter.filter(src):  
                             # Distribute ARE:
                             pt_weight = weight*gsim_weight
                             args = (self, pt, gsim_model, pt_weight, lnSA)
                             args_list.append(args)
-
                 are = 0
+
         for value in Starmap(self.pt_src_are.__func__, args_list):
             are += value
         return are
@@ -252,6 +262,7 @@ class VectorValuedCalculator():
         are = self.are(lnSA)
         return 1-np.exp(-are*self.oqparam.investigation_time)
 
+
     def poe_parallel(self, lnSA):
         """
         Returns the vector-valued probability of exceedance
@@ -260,6 +271,7 @@ class VectorValuedCalculator():
         """
         are = self.are_parallel(lnSA)
         return 1-np.exp(-are*self.oqparam.investigation_time)
+
 
     def hazard_matrix_calculation(self, quantity='poe'):
         """
@@ -295,6 +307,7 @@ class VectorValuedCalculator():
 
         self.hc.hazard_matrix = output
         return self.hc
+
 
     def hazard_matrix_calculation_parallel(self, quantity='poe'):
         """

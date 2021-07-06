@@ -2,13 +2,8 @@ import os
 import h5py
 import numpy as np
 
-from openquake.commonlib.readinput 
-import (get_oqparam,
+from openquake.commonlib import readinput 
                                   
-                                   get_source_model_lt,
-                                           get_gsim_lt,
-                                           get_imts)
-
 from openquake.hazardlib.sourceconverter import SourceConverter
 from openquake.hazardlib.nrml import to_python
 from openquake.hazardlib.site import Site, SiteCollection
