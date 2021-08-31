@@ -42,7 +42,7 @@ def poe2pdf(m, x, diff_option='diff'):
     return pdf, x
 
 
-def cdf2pdf(m, x, diff_option='diff'):
+def cdf2pdf(m, x, diff_option='diff', indexing='ij'):
     ndim = len(m.shape)
     pdf = deepcopy(m)
     shape = np.array(m.shape)
@@ -53,7 +53,7 @@ def cdf2pdf(m, x, diff_option='diff'):
             #x[k][-1] = x[k][-2]+0.5*(x[k][-1]-x[k][-2])
         elif diff_option == 'diff':
             shape[k] -= 1
-            xmat = np.meshgrid(*x, indexing='ij')[k]
+            xmat = np.meshgrid(*x, indexing=indexing)[k]
             pdf = np.diff(pdf, 1, axis=k) / np.diff(xmat, 1, axis=k)
             xx = list()
             for j in range(ndim):
@@ -65,6 +65,23 @@ def cdf2pdf(m, x, diff_option='diff'):
         else:
             raise ValueError(f'Unrecognized "diff_option" value: {diff_option}')
     return pdf, x
+
+
+def pdf2cdf(m, x):
+    ndim = len(m.shape)
+    for k in range(ndim):
+        #dx = np.array([0, np.diff(x[k])])
+        m = np.cumsum(m, axis=k)
+    return m
+
+
+def pdf2poe(m, x):
+    ndim = len(m.shape)
+    for k in range(ndim):
+        #dx = np.array([0, np.diff(x[k])])
+        m = np.flip(np.cumsum(np.flip(m, axis=k), axis=k), axis=k)
+    return m
+
 
 def marginals1D(pdf, x, axis=None):
     """
@@ -113,11 +130,9 @@ def build_marginals(mat, imtls, normalize=False):
     """
     # Remove dimensions of length 1 from the hazard matrix:
     mat = np.squeeze(mat) 
-
     # Compute log of abscissa for each dimension:
     logx = np.array([np.log(imtls[p]) for p in imtls.keys()])
     # x = np.log(np.array([imtls[p] for p in imtls.keys()]))
-
     nd = len(mat.shape)
     print(f'Maximum value of the {nd}-D POE hazard matrix : {mat.max()}')
     pdf, xmod = poe2pdf(mat, logx, diff_option='gradient')
