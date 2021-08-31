@@ -42,6 +42,30 @@ def poe2pdf(m, x, diff_option='diff'):
     return pdf, x
 
 
+def cdf2pdf(m, x, diff_option='diff'):
+    ndim = len(m.shape)
+    pdf = deepcopy(m)
+    shape = np.array(m.shape)
+    for k in range(ndim):
+        if diff_option == 'gradient':
+            pdf = np.gradient(pdf, x[k], axis=k, edge_order=1)
+            #x[k][0] = x[k][0]+0.5*(x[k][1]-x[k][0])
+            #x[k][-1] = x[k][-2]+0.5*(x[k][-1]-x[k][-2])
+        elif diff_option == 'diff':
+            shape[k] -= 1
+            xmat = np.meshgrid(*x, indexing='ij')[k]
+            pdf = np.diff(pdf, 1, axis=k) / np.diff(xmat, 1, axis=k)
+            xx = list()
+            for j in range(ndim):
+                if j == k:
+                    xx.append(np.array(x[k][0:-1] + 0.5 * np.diff(x[k])))
+                else:
+                    xx.append(x[j])
+            x = xx
+        else:
+            raise ValueError(f'Unrecognized "diff_option" value: {diff_option}')
+    return pdf, x
+
 def marginals1D(pdf, x, axis=None):
     """
     Compute the set of N 1-D marginal probability functions associated
