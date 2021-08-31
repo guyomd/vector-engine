@@ -33,15 +33,14 @@ def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=
         delta = f[1] - f[0]
         return [f[0] - delta / 2, f[-1] + delta / 2]
 
-    n = len(x)
     plt.figure()
     plt.imshow(M, aspect='auto',
                interpolation="none")
     ax = plt.gca()
     x_str = [('{:.'+str(ndigits_labels)+'f}').format(a) for a in x]
     y_str = [('{:.'+str(ndigits_labels)+'f}').format(a) for a in y]
-    ax.set_xticks(np.arange(0, n))
-    ax.set_yticks(np.arange(0, n))
+    ax.set_xticks(np.arange(0, len(x)))
+    ax.set_yticks(np.arange(0, len(y)))
     ax.set_xticklabels(x_str, fontsize=8, rotation=45)
     ax.set_yticklabels(y_str, fontsize=8, rotation=45)
     ax.invert_yaxis()
