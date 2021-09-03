@@ -31,6 +31,21 @@ def poe2are(poe: np.ndarray, investigation_time=1.0):
     return -np.log(1 - poe) / float(investigation_time)
 
 
+class HazardCurveGenerator():
+    def __init__(self, oqparam, csm, sitecol):
+        pass
+
+
+class OpenquakeEngine1DHazardGenerator(HazardCurveGenerator):
+    def __init__(self):
+        pass
+
+
+class LocalHazardCurve1DGenerator(HazardCurveGenerator):
+    def __init__(self):
+        pass
+
+
 class VectorValuedCalculator():
 
     def __init__(self, oqparam, csm, sitecol, cm):
@@ -122,8 +137,6 @@ class VectorValuedCalculator():
             # Build covariance matrix:
             #D = np.diag(lnSTD[j,:])
             #cov = D @ self.hc.corr @ D
-            #lower_trunc = lnAVG[j,:]-self.integration_prms['truncation_level']*np.sqrt(np.diag(cov))
-            #upper_trunc = lnAVG[j,:]+self.integration_prms['truncation_level']*np.sqrt(np.diag(cov))
             lower_trunc = -self.integration_prms['truncation_level']*np.ones_like(mu)
             upper_trunc = self.integration_prms['truncation_level']*np.ones_like(mu)
             lower = (np.array(lnSA) - lnAVG[j,:])/lnSTD[j,:] # Convert accel to epsilon
