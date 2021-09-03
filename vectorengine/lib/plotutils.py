@@ -2,6 +2,8 @@ import sys
 import os
 from math import ceil
 from matplotlib import pyplot as plt
+from matplotlib import cm
+from matplotlib.colors import Normalize
 import numpy as np
 from vectorengine.lib.parser import load_dataset_from_hdf5
 from vectorengine.lib.marginals import build_marginals, poe2pdf
@@ -28,15 +30,17 @@ def save_plot(filename, h=None, size=(8,6), keep_opened=False, tight=False, **kw
         plt.close(h.number)
 
 
-def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=2):
+def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=4, 
+                ax=None, cmap="viridis", clim=None):
     def extents(f):
         delta = f[1] - f[0]
         return [f[0] - delta / 2, f[-1] + delta / 2]
 
-    plt.figure()
-    plt.imshow(M, aspect='auto',
+    if ax is None:
+        plt.figure()
+        ax = plt.gca()
+    ax.imshow(M, aspect='auto',
                interpolation="none")
-    ax = plt.gca()
     x_str = [('{:.'+str(ndigits_labels)+'f}').format(a) for a in x]
     y_str = [('{:.'+str(ndigits_labels)+'f}').format(a) for a in y]
     ax.set_xticks(np.arange(0, len(x)))
@@ -44,10 +48,42 @@ def plot_matrix(M, x, y, xlabel, ylabel, title, cbar_title=None, ndigits_labels=
     ax.set_xticklabels(x_str, fontsize=8, rotation=45)
     ax.set_yticklabels(y_str, fontsize=8, rotation=45)
     ax.invert_yaxis()
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    cb = plt.colorbar()
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+   
+    if clim is None:
+        norm = Normalize(vmin=M.min(), vmax=M.max(), clip=False)
+    else:
+        # clim should be a tuple of 2 elements
+        norm = Normalize(vmin=clim[0], vmax=clim[1], clip=False)
+    cb = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
+    if cbar_title is not None:
+        cb.ax.set_title(cbar_title)
+
+
+def plot_contours(M, x, y, xlabel, ylabel, title, clim=None, cbar_title=None,
+                  ax=None, levels=None, colors=None, cmap="viridis"):
+    def extents(f):
+        delta = f[1] - f[0]
+        return [f[0] - delta / 2, f[-1] + delta / 2]
+
+    if ax is None:
+        plt.figure()
+        ax = plt.gca()
+    if levels is None:
+        ax.contour(x, y, M, colors=colors, cmap=cmap)
+    else:
+        ax.contour(x, y, M, levels, colors=colors, cmap=cmap)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    if clim is None:
+        norm = Normalize(vmin=M.min(), vmax=M.max(), clip=False)
+    else:
+        # clim should be a tuple of 2 elements
+        norm = Normalize(vmin=clim[0], vmax=clim[1], clip=False)
+    cb = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
     if cbar_title is not None:
         cb.ax.set_title(cbar_title)
 
