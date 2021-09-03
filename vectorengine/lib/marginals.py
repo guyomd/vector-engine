@@ -42,10 +42,10 @@ def poe2pdf(m, x, diff_option='diff'):
     return pdf, x
 
 
-def cdf2pdf(m, x, diff_option='diff', indexing='ij'):
-    ndim = len(m.shape)
-    pdf = deepcopy(m)
-    shape = np.array(m.shape)
+def cdf2pdf(cdf, x, diff_option='diff', indexing='ij'):
+    ndim = len(cdf.shape)
+    pdf = deepcopy(cdf)
+    shape = np.array(cdf.shape)
     for k in range(ndim):
         if diff_option == 'gradient':
             pdf = np.gradient(pdf, x[k], axis=k, edge_order=1)
@@ -67,21 +67,50 @@ def cdf2pdf(m, x, diff_option='diff', indexing='ij'):
     return pdf, x
 
 
-def pdf2cdf(m, x):
-    ndim = len(m.shape)
+def pdf2cdf(pdf, x, norm=None):
+    #TODO: Check that normalization is ok. In particular when binwidth is not constant
+    ndim = len(pdf.shape)
+    cdf = deepcopy(pdf)
     for k in range(ndim):
-        #dx = np.array([0, np.diff(x[k])])
-        m = np.cumsum(m, axis=k)
-    return m
+        cdf = np.cumsum(cdf, axis=k)
+    if norm is None:
+        norm = integrationND(pdf, x)
+    cdf *= norm/cdf.max()
+    return cdf
 
 
-def pdf2poe(m, x):
-    ndim = len(m.shape)
+def pdf2poe(pdf, x, norm=None):
+    #TODO: Check that normalization is ok. In particular when binwidth is not constant
+    ndim = len(pdf.shape)
+    poe = deepcopy(pdf)
     for k in range(ndim):
-        #dx = np.array([0, np.diff(x[k])])
-        m = np.flip(np.cumsum(np.flip(m, axis=k), axis=k), axis=k)
-    return m
+        poe = np.flip(np.cumsum(np.flip(poe, axis=k), axis=k), axis=k)
+    if norm is None:
+        norm = integrationND(pdf, x)
+    poe *= norm/poe.max()
+    return poe
+"""
+def pdf2cdf(pdf, x, indexing='ij'):
+    #TEST: Account for the non-constant binwidth case
+    ndim = len(pdf.shape)
+    cdf = deepcopy(pdf)
+    for k in range(ndim):
+        xnd = np.meshgrid(*x, indexing=indexing)[k]
+        dx = np.insert(np.diff(xnd, axis=k), 0, 0, axis=k)
+        cdf = np.cumsum(cdf*dx, axis=k)
+    return cdf
 
+
+def pdf2poe(pdf, x, indexing='ij'):
+    #TEST: Account for the non-constant binwidth case
+    ndim = len(pdf.shape)
+    poe = deepcopy(pdf)
+    for k in range(ndim):
+        xnd = np.meshgrid(*x, indexing=indexing)[k]
+        dx = np.insert(np.diff(xnd, axis=k), 0, 0, axis=k)
+        poe = np.flip(np.cumsum(np.flip(poe*dx, axis=k), axis=k), axis=k)
+    return poe
+"""
 
 def marginals1D(pdf, x, axis=None):
     """
